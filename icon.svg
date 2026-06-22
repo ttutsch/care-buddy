@@ -1,0 +1,26 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3fc0e6"/>
+      <stop offset="1" stop-color="#1fb0bf"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#eaf7ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- water drop -->
+  <path d="M256 120 C330 222 366 268 366 314 a110 110 0 0 1 -220 0 C146 268 182 222 256 120 z" fill="url(#drop)"/>
+  <!-- happy face on the drop -->
+  <circle cx="222" cy="312" r="15" fill="#1fb0bf"/>
+  <circle cx="290" cy="312" r="15" fill="#1fb0bf"/>
+  <circle cx="216" cy="306" r="5" fill="#fff"/>
+  <circle cx="284" cy="306" r="5" fill="#fff"/>
+  <path d="M214 348 q42 34 84 0" stroke="#1fb0bf" stroke-width="13" fill="none" stroke-linecap="round"/>
+  <!-- cheeks -->
+  <ellipse cx="200" cy="338" rx="13" ry="9" fill="#ff9e86" opacity=".7"/>
+  <ellipse cx="312" cy="338" rx="13" ry="9" fill="#ff9e86" opacity=".7"/>
+  <!-- little heart sparkle -->
+  <path d="M372 168 c6 -10 22 -8 22 5 c0 9 -12 16 -22 24 c-10 -8 -22 -15 -22 -24 c0 -13 16 -15 22 -5 z" fill="#ffd23f"/>
+</svg>

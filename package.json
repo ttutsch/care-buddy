@@ -1,0 +1,14 @@
+{
+  "name": "care-buddy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "A daily hydration + medicine care companion for kids (single-file PWA).",
+  "scripts": {
+    "dev": "http-server . -p 5180 -c-1 -a 127.0.0.1",
+    "make-icons": "node scripts/make-icons.mjs"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "sharp": "^0.33.5"
+  }
+}

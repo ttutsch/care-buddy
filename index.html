@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Care Buddy</title>
+
+<!-- PWA / Add to Home Screen -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Care Buddy">
+<meta name="theme-color" content="#2bb3c0">
+<style>
+  :root {
+    --bg: #eaf6fb;
+    --surface: #ffffff;
+    --surface-2: #f3fafd;
+    --border: #dcebf1;
+    --text: #233640;
+    --muted: #6a838d;
+    --accent: #1fb0bf;
+    --accent-deep: #0d8c9a;
+    --accent-soft: #d6f2f6;
+    --water: #34b3ec;
+    --water-deep: #1f93cf;
+    --water-soft: #e0f2fc;
+    --med: #7c5cff;
+    --med-soft: #ece6ff;
+    --good: #1fa874;
+    --good-soft: #ddf4e9;
+    --warn: #db8400;
+    --warn-soft: #fdf1d6;
+    --sun: #ffce3a;
+    --pink: #ff8fa3;
+    --radius: 20px;
+    --radius-sm: 13px;
+    --shadow: 0 1px 2px rgba(16,48,60,.05), 0 10px 26px rgba(16,48,60,.09);
+    --shadow-sm: 0 1px 2px rgba(16,48,60,.05), 0 3px 8px rgba(16,48,60,.06);
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(120% 60% at 50% -10%, #ffffff 0%, rgba(255,255,255,0) 60%),
+      var(--bg);
+    overscroll-behavior-y: contain;
+  }
+  .app {
+    max-width: 460px; margin: 0 auto;
+    padding:
+      max(14px, env(safe-area-inset-top))
+      max(14px, env(safe-area-inset-right))
+      max(40px, calc(env(safe-area-inset-bottom) + 24px))
+      max(14px, env(safe-area-inset-left));
+  }
+
+  /* ---------- Top bar ---------- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 10px; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 19px; letter-spacing: -0.02em; }
+  .brand .logo { width: 30px; height: 30px; display: block; }
+  .brand b { color: var(--accent-deep); font-weight: 800; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 11px; font-weight: 700; font-size: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .pill.streak { color: var(--warn); }
+  .pill.stars { color: #c08a00; }
+  .icon-btn {
+    appearance: none; border: 1px solid var(--border); background: var(--surface);
+    width: 38px; height: 38px; border-radius: 12px; cursor: pointer;
+    display: grid; place-items: center; box-shadow: var(--shadow-sm); padding: 0;
+  }
+  .icon-btn:active { transform: scale(.94); }
+
+  .greeting { padding: 2px 6px 12px; }
+  .greeting h1 { margin: 0; font-size: 23px; letter-spacing: -0.02em; }
+  .greeting p { margin: 3px 0 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 16px; margin: 0 0 14px;
+  }
+  .card h2 { margin: 0 0 2px; font-size: 16px; letter-spacing: -0.01em; }
+  .card .sub { color: var(--muted); font-size: 13px; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .between { justify-content: space-between; }
+
+  /* ---------- Buddy (character) ---------- */
+  .buddy-card {
+    position: relative; overflow: hidden;
+    padding: 14px 14px 16px;
+    background: linear-gradient(180deg, var(--sky-top, #bfeaff) 0%, var(--sky-bot, #eafaff) 78%);
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+  .buddy-stage { position: relative; width: 220px; max-width: 70vw; margin: 2px auto 4px; }
+  .buddy-stage svg { width: 100%; height: auto; display: block; }
+  .buddy-bob { animation: bob 4.2s ease-in-out infinite; transform-origin: 50% 90%; }
+  @keyframes bob { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-6px) } }
+  .buddy-status { font-size: 16.5px; font-weight: 800; letter-spacing: -0.01em; margin: 4px 8px 2px; color: #1c3a44; }
+  .buddy-name { color: var(--accent-deep); }
+  .health-bar { height: 9px; border-radius: 999px; background: rgba(255,255,255,.6); overflow: hidden; margin: 10px auto 2px; max-width: 230px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.04); }
+  .health-fill { height: 100%; border-radius: 999px; transition: width .5s cubic-bezier(.2,.8,.2,1), background .5s; }
+  .health-label { font-size: 12px; color: #3a5a64; font-weight: 700; margin-top: 5px; opacity: .85; }
+
+  /* ---------- Water ---------- */
+  .water-card .row { align-items: stretch; }
+  .bottle-wrap { display: flex; align-items: flex-end; justify-content: center; width: 78px; flex: 0 0 78px; }
+  .bottle {
+    position: relative; width: 56px; height: 104px;
+    border: 3px solid var(--water-deep); border-radius: 14px 14px 16px 16px;
+    background: var(--water-soft); overflow: hidden;
+  }
+  .bottle::before {
+    content: ""; position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 11px; background: var(--water-deep); border-radius: 5px 5px 0 0;
+  }
+  .bottle-fill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, #5cc6f3, var(--water));
+    transition: height .55s cubic-bezier(.2,.8,.2,1);
+  }
+  .bottle-fill::before {
+    content: ""; position: absolute; top: -7px; left: 0; right: 0; height: 10px;
+    background: radial-gradient(circle at 8px -3px, transparent 7px, #5cc6f3 7px) repeat-x;
+    background-size: 16px 10px; opacity: .9;
+  }
+  .water-main { flex: 1; min-width: 0; }
+  .water-count { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .water-count small { font-size: 15px; color: var(--muted); font-weight: 700; }
+  .water-goalmsg { font-size: 13px; font-weight: 700; color: var(--water-deep); margin-top: 4px; }
+  .water-goalmsg.done { color: var(--good); }
+  .water-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+  .btn {
+    appearance: none; border: none; cursor: pointer; font-family: inherit;
+    border-radius: var(--radius-sm); font-weight: 800; font-size: 15px;
+    padding: 13px 16px; box-shadow: var(--shadow-sm); transition: transform .08s, filter .15s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn-water { background: var(--water); color: #fff; flex: 1; font-size: 16px; }
+  .btn-water:active { filter: brightness(.96); }
+  .btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+  .btn-mini { padding: 11px 14px; flex: 0 0 auto; }
+  .btn-med { background: var(--med); color: #fff; }
+  .btn-block { width: 100%; }
+  .btn-good { background: var(--good); color: #fff; }
+  .btn-sun { background: var(--sun); color: #5a4500; }
+
+  /* ---------- Medicine ---------- */
+  .timer-box {
+    background: linear-gradient(180deg, var(--med-soft), #f6f3ff);
+    border: 1px solid #e2d9ff; border-radius: var(--radius-sm);
+    padding: 13px 14px; margin-bottom: 13px; text-align: center;
+  }
+  .timer-label { font-size: 12px; font-weight: 800; color: #6a52cc; text-transform: uppercase; letter-spacing: .04em; }
+  .timer-big { font-size: 27px; font-weight: 800; letter-spacing: -0.02em; margin: 2px 0; color: #3a2a7a; }
+  .timer-next { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .timer-next.late { color: var(--warn); }
+  .dose {
+    display: flex; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border);
+  }
+  .dose:first-of-type { border-top: none; }
+  .dose-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 40px; font-size: 20px; background: var(--med-soft); }
+  .dose-ico.sun { background: var(--warn-soft); }
+  .dose-info { flex: 1; min-width: 0; }
+  .dose-title { font-weight: 800; font-size: 15px; }
+  .dose-meta { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+  .dose-meta.due { color: var(--warn); }
+  .dose-meta.done { color: var(--good); }
+  .dose-btn { flex: 0 0 auto; }
+  .check {
+    width: 40px; height: 40px; border-radius: 12px; border: none; cursor: pointer;
+    background: var(--good); color: #fff; font-size: 20px; display: grid; place-items: center; box-shadow: var(--shadow-sm);
+  }
+  .undo-link { background: none; border: none; color: var(--muted); font-size: 12.5px; font-weight: 700; cursor: pointer; text-decoration: underline; padding: 4px; }
+  .careteam-note {
+    margin-top: 10px; font-size: 12.5px; color: var(--warn); background: var(--warn-soft);
+    border-radius: 10px; padding: 9px 11px; font-weight: 700; display: flex; gap: 7px; align-items: flex-start;
+  }
+
+  /* ---------- Tip ---------- */
+  .tip-card { background: linear-gradient(180deg, #fff9e8, #fffdf6); border-color: #f3e6bf; }
+  .tip-head { display: flex; align-items: center; justify-content: space-between; }
+  .tip-head h2 { color: #a9750a; }
+  .tip-body { font-size: 15px; font-weight: 600; line-height: 1.4; margin-top: 6px; color: #4a3a1c; }
+
+  /* ---------- Footer ---------- */
+  .footer { text-align: center; color: var(--muted); font-size: 11.5px; line-height: 1.5; padding: 6px 12px 0; font-weight: 600; }
+  .footer a { color: var(--accent-deep); }
+
+  /* ---------- Settings & onboarding ---------- */
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-weight: 800; font-size: 13.5px; margin-bottom: 6px; }
+  .field .hint { font-weight: 600; color: var(--muted); font-size: 12px; margin-top: 5px; }
+  input[type="text"], input[type="number"], input[type="time"], select {
+    width: 100%; font-family: inherit; font-size: 16px; font-weight: 600;
+    padding: 12px 13px; border: 1.5px solid var(--border); border-radius: 12px;
+    background: var(--surface-2); color: var(--text);
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > * { flex: 1; }
+  .seg { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seg .btn { flex: 1; min-width: 84px; }
+  .section-title { font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 4px 8px; }
+  .danger { color: #d24b46; }
+  .btn-danger { background: #fdeceb; color: #c43a35; }
+  .disclaimer { font-size: 12.5px; color: var(--muted); line-height: 1.5; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 13px; }
+
+  .quickshift { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .quickshift .btn { flex: 1; padding: 10px 8px; font-size: 13.5px; }
+
+  /* ---------- Confetti ---------- */
+  .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+  .confetti span { position: absolute; top: -24px; font-size: 22px; animation: fall linear forwards; }
+  @keyframes fall { to { transform: translateY(105vh) rotate(540deg); opacity: .9; } }
+
+  .pop { animation: pop .4s ease; }
+  @keyframes pop { 0%{ transform: scale(1) } 40%{ transform: scale(1.14) } 100%{ transform: scale(1) } }
+
+  .center { text-align: center; }
+  .mt { margin-top: 14px; }
+  .muted { color: var(--muted); }
+
+  /* ---------- stats strip ---------- */
+  .stats-strip { display: flex; gap: 8px; padding: 0 2px 12px; }
+  .stat {
+    flex: 1; appearance: none; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 14px; padding: 9px 6px; cursor: pointer; box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; align-items: center; gap: 1px; font-family: inherit;
+  }
+  .stat:active { transform: scale(.96); }
+  .stat .em { font-size: 17px; }
+  .stat b { font-size: 18px; letter-spacing: -.02em; }
+  .stat span { font-size: 11px; color: var(--muted); font-weight: 700; }
+
+  /* ---------- customize ---------- */
+  .customize-fab {
+    position: absolute; top: 12px; right: 12px; z-index: 2;
+    width: 36px; height: 36px; border-radius: 12px; border: none; cursor: pointer;
+    background: rgba(255,255,255,.82); box-shadow: var(--shadow-sm); font-size: 17px;
+  }
+  .buddy-stage { cursor: pointer; }
+  .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+  .swatch {
+    width: 42px; height: 42px; border-radius: 50%; cursor: pointer; border: 3px solid #fff;
+    box-shadow: 0 0 0 1.5px var(--border), var(--shadow-sm); padding: 0;
+  }
+  .swatch.sel { box-shadow: 0 0 0 3px var(--accent), var(--shadow-sm); }
+  .toggle {
+    appearance: none; border: none; cursor: pointer; font-family: inherit; font-weight: 800;
+    border-radius: 999px; padding: 9px 18px; font-size: 14px; box-shadow: var(--shadow-sm);
+  }
+  .toggle.on { background: var(--good); color: #fff; }
+  .toggle.off { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ---------- history / calendar ---------- */
+  .stats-card { display: flex; gap: 6px; }
+  .stat-big { flex: 1; text-align: center; }
+  .stat-big .em { font-size: 19px; }
+  .stat-big b { display: block; font-size: 21px; letter-spacing: -.02em; margin-top: 1px; }
+  .stat-big span { font-size: 10.5px; color: var(--muted); font-weight: 700; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-head .m { font-weight: 800; font-size: 16px; }
+  .cal-nav { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; font-size: 17px; font-weight: 800; }
+  .cal-nav:disabled { opacity: .35; cursor: default; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); padding-bottom: 2px; }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 12px; font-weight: 700; cursor: default; position: relative;
+  }
+  .cal-cell.empty { background: transparent; border: none; }
+  .cal-cell.has { cursor: pointer; }
+  .cal-cell.perfect { background: #fff6da; border-color: #ffd98a; }
+  .cal-cell.today { outline: 2px solid var(--accent); outline-offset: 0; }
+  .cal-cell.sel { outline: 2px solid var(--med); }
+  .cal-dots { display: flex; gap: 3px; height: 7px; }
+  .cal-dot { width: 7px; height: 7px; border-radius: 50%; background: #d6dee3; }
+  .cal-dot.water { background: var(--water); }
+  .cal-dot.med { background: var(--med); }
+  .cal-star { position: absolute; top: 1px; right: 3px; font-size: 9px; }
+  .day-detail { margin-top: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; font-size: 13.5px; font-weight: 600; }
+  .day-detail b { font-weight: 800; }
+
+  /* ---------- rewards ---------- */
+  .rewards-progress { font-weight: 800; font-size: 15px; }
+  .sticker-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .sticker { text-align: center; border-radius: 14px; padding: 12px 6px; border: 1px solid var(--border); }
+  .sticker.got { background: linear-gradient(180deg, #fff7e6, #fffdf7); border-color: #ffe2a6; }
+  .sticker.locked { background: var(--surface-2); opacity: .8; }
+  .sticker-emoji { font-size: 34px; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.12)); }
+  .sticker.locked .sticker-emoji { filter: grayscale(1); opacity: .5; }
+  .sticker-name { font-weight: 800; font-size: 12.5px; margin-top: 6px; }
+  .sticker-desc { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 2px; line-height: 1.3; }
+
+  /* ---------- toast ---------- */
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 22px); transform: translateX(-50%);
+    background: #2a2440; color: #fff; padding: 12px 18px; border-radius: 999px; font-weight: 800; font-size: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 60; animation: toastIn .3s ease, toastOut .4s ease 2.6s forwards;
+    max-width: 90vw; text-align: center;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } }
+  @keyframes toastOut { to { opacity: 0; transform: translate(-50%, 14px); } }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script type="module">
+/* ============================================================
+   Care Buddy — a daily hydration + medicine care companion.
+   Single-file PWA. All data stays on this device (localStorage).
+   This app helps build healthy habits and remember a routine.
+   It is NOT medical advice. Always follow the care team's plan.
+   ============================================================ */
+
+const VERSION = "1.0";
+const STORAGE_KEY = "care-buddy-v1";
+
+/* ---------- tiny DOM helper ---------- */
+function h(tag, props, ...kids) {
+  const n = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
+    else if (k === "html") n.innerHTML = v;
+    else if (k === "dataset") Object.assign(n.dataset, v);
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
+    else n.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    n.appendChild(typeof kid === "object" ? kid : document.createTextNode(String(kid)));
+  }
+  return n;
+}
+
+/* ---------- storage ---------- */
+let storageOK = (() => {
+  try { localStorage.setItem("_t", "1"); localStorage.removeItem("_t"); return true; }
+  catch { return false; }
+})();
+let memoryState = null;
+
+function defaultState() {
+  return {
+    version: 1,
+    setupDone: false,
+    kidName: "",
+    buddyName: "Sunny",
+    settings: {
+      waterGoal: 6,
+      waterUnit: "cups",
+      perTap: 1,
+      doseAM: "08:00",
+      dosePM: "20:00",
+    },
+    today: { date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false },
+    lastDoseAt: null,
+    history: {},
+    stars: 0,
+    bestStreak: 0,
+    tipIndex: 0,
+    appearance: { skin: "#f4c39a", hair: "#6e4429", shirt: "#2bb3a6", glasses: false },
+    stickers: [],
+  };
+}
+
+function loadState() {
+  let raw = null;
+  if (storageOK) { try { raw = localStorage.getItem(STORAGE_KEY); } catch {} }
+  else if (memoryState) return memoryState;
+  if (!raw) return defaultState();
+  try {
+    const s = Object.assign(defaultState(), JSON.parse(raw));
+    s.settings = Object.assign(defaultState().settings, s.settings || {});
+    s.appearance = Object.assign(defaultState().appearance, s.appearance || {});
+    if (!Array.isArray(s.stickers)) s.stickers = [];
+    s.today = Object.assign({ date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false }, s.today || {});
+    s.today.doses = Object.assign({ am: null, pm: null }, s.today.doses || {});
+    return s;
+  } catch { return defaultState(); }
+}
+
+function save() {
+  if (storageOK) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { storageOK = false; } }
+  if (!storageOK) memoryState = state;
+}
+
+/* ---------- date / time helpers ---------- */
+function todayKey(d = new Date()) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function keyToDate(key) { const [y, m, d] = key.split("-").map(Number); return new Date(y, m - 1, d, 12, 0, 0); }
+function prevKey(key) { const d = keyToDate(key); d.setDate(d.getDate() - 1); return todayKey(d); }
+function minutesNow() { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); }
+function parseHHMM(s) { const [h, m] = (s || "08:00").split(":").map(Number); return (h || 0) * 60 + (m || 0); }
+function fmtClock(hhmm) {
+  let mm = parseHHMM(hhmm); let h = Math.floor(mm / 60), m = mm % 60;
+  const ap = h >= 12 ? "PM" : "AM"; let hr = h % 12; if (hr === 0) hr = 12;
+  return hr + ":" + String(m).padStart(2, "0") + " " + ap;
+}
+function doseDateToday(hhmm, dayOffset = 0) {
+  const d = new Date(); d.setDate(d.getDate() + dayOffset);
+  d.setHours(0, 0, 0, 0); d.setMinutes(parseHHMM(hhmm)); return d;
+}
+function fmtDur(ms) {
+  if (ms < 0) ms = 0;
+  const totalMin = Math.floor(ms / 60000);
+  const hrs = Math.floor(totalMin / 60), mins = totalMin % 60;
+  if (hrs > 0) return hrs + "h " + mins + "m";
+  if (mins > 0) return mins + "m";
+  return "just now";
+}
+
+/* ---------- daily rollover + streak ---------- */
+function ensureToday() {
+  const tk = todayKey();
+  if (state.today.date === tk) return;
+  // finalize the stored day into history
+  const t = state.today;
+  const g = state.settings.waterGoal;
+  const perfect = t.water >= g && !!t.doses.am && !!t.doses.pm;
+  state.history[t.date] = {
+    water: t.water, goal: g,
+    am: !!t.doses.am, pm: !!t.doses.pm, perfect,
+  };
+  if (perfect) state.stars += 1;
+  // advance tip
+  state.tipIndex = (state.tipIndex + 1) % TIPS.length;
+  // reset today
+  state.today = { date: tk, water: 0, doses: { am: null, pm: null }, celebrated: false };
+  const s = currentStreak();
+  if (s > state.bestStreak) state.bestStreak = s;
+  save();
+}
+function currentStreak() {
+  let s = 0, k = prevKey(todayKey());
+  while (state.history[k] && state.history[k].perfect) { s++; k = prevKey(k); }
+  return s;
+}
+
+/* ---------- wellness / mood model ----------
+   health 0-100 from two equal pillars:
+   - hydration (50): keeps pace toward the daily goal (no penalty in the morning)
+   - medicine (50): doses that are DUE are taken; future doses don't count against her
+   Gentle by design — recovers instantly when she logs water or a dose.        */
+const DAY_START = 7 * 60, DAY_END = 20 * 60;
+
+function wellness() {
+  const t = state.today, set = state.settings;
+  const now = minutesNow();
+
+  // hydration
+  let hyd;
+  if (t.water >= set.waterGoal) hyd = 1;
+  else {
+    const frac = Math.max(0, Math.min(1, (now - DAY_START) / (DAY_END - DAY_START)));
+    const paceTarget = set.waterGoal * frac;
+    hyd = paceTarget <= 0.01 ? 1 : Math.max(0, Math.min(1, t.water / paceTarget));
+  }
+  const hydBehind = t.water < set.waterGoal && hyd < 0.7;
+
+  // medicine
+  const doses = [
+    { key: "am", label: "morning", mins: parseHHMM(set.doseAM), taken: t.doses.am },
+    { key: "pm", label: "evening", mins: parseHHMM(set.dosePM), taken: t.doses.pm },
+  ];
+  let dueShare = 0, earned = 0, dueNow = null, lateNow = null;
+  for (const d of doses) {
+    if (d.taken) { dueShare += 1; earned += 1; }
+    else if (now >= d.mins) {
+      dueShare += 1;
+      const late = now - d.mins;
+      if (late > 60) { earned += 0; lateNow = lateNow || d; }
+      else { earned += 0.6; dueNow = dueNow || d; }
+    }
+  }
+  const medPct = dueShare > 0 ? earned / dueShare : 1;
+
+  const health = Math.round(hyd * 50 + medPct * 50);
+
+  let mood;
+  if (health >= 85) mood = "thriving";
+  else if (health >= 66) mood = "happy";
+  else if (health >= 46) mood = "okay";
+  else if (health >= 26) mood = "tired";
+  else mood = "unwell";
+
+  const perfect = t.water >= set.waterGoal && t.doses.am && t.doses.pm;
+
+  return { health, mood, hydBehind, dueNow, lateNow, perfect, doses };
+}
+
+function statusMessage(w) {
+  const b = state.buddyName || "Sunny";
+  if (w.perfect) return [b + " feels amazing — you did it today!", "💛"];
+  if (w.lateNow) return ["The " + w.lateNow.label + " medicine looks late. Check with a grown-up.", "🕗"];
+  if (w.dueNow) return ["It's time for the " + w.dueNow.label + " medicine! Tap ✓ when it's done.", "💊"];
+  if (w.hydBehind) return [b + " is getting thirsty — add some water!", "💧"];
+  if (w.mood === "thriving") return [b + " feels great!", "✨"];
+  if (w.mood === "happy") return [b + " is doing well!", "😊"];
+  if (w.mood === "okay") return [b + " is doing okay.", "🙂"];
+  if (w.mood === "tired") return [b + " is getting sleepy — some water and care will help.", "😴"];
+  return [b + " is feeling under the weather. Let's take care of her.", "🤒"];
+}
+
+/* ---------- the character (Raina-style girl), parametric by mood ---------- */
+function buddySVG(mood, flags, appe) {
+  const thirsty = flags && flags.thirsty;
+  const doseDue = flags && flags.doseDue;
+  const ap = appe || (state && state.appearance) || { skin: "#f4c39a", hair: "#6e4429", shirt: "#2bb3a6", glasses: false };
+  const pale = mood === "unwell";
+  const line = "#5b4636";
+  const skin = pale ? mix(ap.skin, "#c8c2cc", 0.42) : ap.skin;
+  const skinShade = shade(skin, -0.11);
+  const hair = ap.hair, hairHi = shade(ap.hair, 0.2);
+  const shirt = pale ? mix(ap.shirt, "#93a3ab", 0.5) : ap.shirt;
+  const shirtDk = shade(shirt, -0.16);
+  const cheek = pale ? "#cdb8d6" : "#ff9e86";
+  const cheekOp = mood === "thriving" ? 0.9 : mood === "happy" ? 0.75 : pale ? 0.55 : 0.5;
+  let glassesSVG = "";
+  if (ap.glasses) {
+    glassesSVG = `<g fill="#ffffff" fill-opacity="0.10" stroke="#3a2c28" stroke-width="2.4">
+      <circle cx="84" cy="103" r="11.5"/><circle cx="116" cy="103" r="11.5"/>
+      <path d="M95.5 102 q4.5 -3 9 0" fill="none"/><path d="M72.5 100 l-9 -2.5" fill="none"/><path d="M127.5 100 l9 -2.5" fill="none"/></g>`;
+  }
+
+  // eyes
+  let eyes;
+  if (mood === "thriving" || mood === "happy") {
+    const r = mood === "thriving" ? 6.4 : 5.8;
+    eyes = `
+      <g>
+        <ellipse cx="84" cy="103" rx="${r}" ry="${r + 1}" fill="#fff" stroke="${line}" stroke-width="1.4"/>
+        <ellipse cx="116" cy="103" rx="${r}" ry="${r + 1}" fill="#fff" stroke="${line}" stroke-width="1.4"/>
+        <circle cx="85" cy="104.5" r="3.4" fill="#3a2c28"/>
+        <circle cx="117" cy="104.5" r="3.4" fill="#3a2c28"/>
+        <circle cx="83.4" cy="103" r="1.3" fill="#fff"/>
+        <circle cx="115.4" cy="103" r="1.3" fill="#fff"/>
+      </g>
+      <path d="M76 92 q8 -5 16 -1" stroke="${line}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M108 91 q8 -4 16 1" stroke="${line}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  } else if (mood === "okay") {
+    eyes = `
+      <circle cx="84" cy="103" r="3.6" fill="#3a2c28"/>
+      <circle cx="116" cy="103" r="3.6" fill="#3a2c28"/>
+      <circle cx="82.8" cy="101.8" r="1.1" fill="#fff"/>
+      <circle cx="114.8" cy="101.8" r="1.1" fill="#fff"/>
+      <path d="M77 93 q7 -3 15 -1" stroke="${line}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M108 92 q8 -2 15 1" stroke="${line}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  } else if (mood === "tired") {
+    eyes = `
+      <path d="M77 104 q7 4 15 0" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M108 104 q7 4 15 0" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M77 96 q7 1 14 -1" stroke="${line}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <path d="M109 95 q7 -2 14 1" stroke="${line}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+  } else { // unwell — gentle, droopy & worried
+    eyes = `
+      <path d="M78 106 q6 4 13 1" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M109 107 q6 3 13 -1" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <path d="M78 95 q7 3 14 0" stroke="${line}" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+      <path d="M108 95 q7 3 14 0" stroke="${line}" stroke-width="1.9" fill="none" stroke-linecap="round"/>`;
+  }
+
+  // mouth
+  let mouth;
+  if (mood === "thriving") mouth = `<path d="M88 120 q12 13 24 0 q-12 6 -24 0 z" fill="#a23b3b" stroke="${line}" stroke-width="1.6" stroke-linejoin="round"/><path d="M92 124 q8 4 16 0" fill="#ff9d9d"/>`;
+  else if (mood === "happy") mouth = `<path d="M89 120 q11 9 22 0" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+  else if (mood === "okay") mouth = `<path d="M91 121 q9 3 18 0" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+  else if (mood === "tired") mouth = `<ellipse cx="100" cy="122" rx="5" ry="6" fill="#a23b3b" stroke="${line}" stroke-width="1.6"/>`; // small yawn
+  else mouth = `<path d="M91 124 q9 -5 18 0" stroke="${line}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`; // gentle frown
+
+  // accessories
+  let sparkles = "";
+  if (mood === "thriving") {
+    sparkles = `
+      <g fill="#ffd23f" stroke="#f0a500" stroke-width=".6">
+        <path d="M52 70 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 z"/>
+        <path d="M150 64 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6 z"/>
+        <path d="M158 110 l1.3 3.4 3.4 1.3 -3.4 1.3 -1.3 3.4 -1.3 -3.4 -3.4 -1.3 3.4 -1.3 z"/>
+      </g>`;
+  }
+  let zzz = "";
+  if (mood === "tired") {
+    zzz = `<g fill="#7c93a0" font-family="ui-rounded, sans-serif" font-weight="800">
+      <text x="142" y="70" font-size="13">z</text><text x="150" y="60" font-size="17">z</text><text x="160" y="48" font-size="21">z</text></g>`;
+  }
+  let blanket = "";
+  if (mood === "unwell") {
+    blanket = `<path d="M55 200 q45 -34 90 0 z" fill="#b58bd6" opacity=".55"/>
+      <path d="M62 178 q38 -18 76 0" stroke="#9b6fc4" stroke-width="3" fill="none" opacity=".5"/>`;
+  }
+  // thought bubbles (overlays)
+  let bubble = "";
+  if (doseDue) {
+    bubble = `
+      <g>
+        <circle cx="150" cy="58" r="17" fill="#fff" stroke="#d7cdf5" stroke-width="1.6"/>
+        <circle cx="133" cy="74" r="5" fill="#fff" stroke="#d7cdf5" stroke-width="1.4"/>
+        <circle cx="126" cy="83" r="3" fill="#fff" stroke="#d7cdf5" stroke-width="1.2"/>
+        <ellipse cx="150" cy="58" rx="9" ry="6" fill="#ece6ff" stroke="#7c5cff" stroke-width="1.4"/>
+        <rect x="147" y="53" width="6" height="10" rx="3" fill="#7c5cff" transform="rotate(40 150 58)"/>
+      </g>`;
+  } else if (thirsty) {
+    bubble = `
+      <g>
+        <circle cx="150" cy="58" r="17" fill="#fff" stroke="#cfe9f8" stroke-width="1.6"/>
+        <circle cx="133" cy="74" r="5" fill="#fff" stroke="#cfe9f8" stroke-width="1.4"/>
+        <circle cx="126" cy="83" r="3" fill="#fff" stroke="#cfe9f8" stroke-width="1.2"/>
+        <path d="M150 49 c6 8 8 11 8 14 a8 8 0 0 1 -16 0 c0 -3 2 -6 8 -14 z" fill="#34b3ec"/>
+        <circle cx="147" cy="62" r="1.6" fill="#bfe6fb"/>
+      </g>`;
+  }
+
+  return `<svg viewBox="0 0 200 205" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Your buddy, mood: ${mood}">
+    <!-- shoulders / shirt -->
+    <path d="M48 205 v-20 q0 -32 30 -40 l44 0 q30 8 30 40 v20 z" fill="${shirt}" stroke="${line}" stroke-width="2"/>
+    <path d="M78 146 q22 16 44 0 l0 8 q-22 16 -44 0 z" fill="${shirtDk}" opacity=".5"/>
+    ${blanket}
+    <!-- neck -->
+    <path d="M90 138 h20 v10 q-10 8 -20 0 z" fill="${skinShade}" stroke="${line}" stroke-width="1.6"/>
+    <!-- hair back -->
+    <path d="M55 108 q-4 -54 45 -56 q49 2 45 56 q2 26 -8 40 q-6 -30 -10 -40 q-27 12 -54 0 q-10 12 -10 40 q-10 -16 -8 -40 z" fill="${hair}"/>
+    <!-- head -->
+    <ellipse cx="100" cy="104" rx="38" ry="41" fill="${skin}" stroke="${line}" stroke-width="2"/>
+    <!-- ears -->
+    <circle cx="63" cy="108" r="6" fill="${skin}" stroke="${line}" stroke-width="1.6"/>
+    <circle cx="137" cy="108" r="6" fill="${skin}" stroke="${line}" stroke-width="1.6"/>
+    <!-- cheeks -->
+    <ellipse cx="78" cy="116" rx="7.5" ry="5" fill="${cheek}" opacity="${cheekOp}"/>
+    <ellipse cx="122" cy="116" rx="7.5" ry="5" fill="${cheek}" opacity="${cheekOp}"/>
+    <!-- nose -->
+    <path d="M99 110 q1 4 2 5" stroke="${line}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    ${eyes}
+    ${mouth}
+    ${glassesSVG}
+    <!-- hair front / bangs -->
+    <path d="M62 96 q-4 -50 38 -52 q42 2 38 52 q-10 -20 -24 -22 q4 10 -2 16 q-6 -14 -12 -16 q-6 12 -16 14 q-8 -2 -10 -8 q-4 8 -12 16 z" fill="${hair}"/>
+    <path d="M70 70 q14 -10 30 -10" stroke="${hairHi}" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/>
+    ${sparkles}
+    ${zzz}
+    ${bubble}
+  </svg>`;
+}
+
+function skyForMood(mood) {
+  switch (mood) {
+    case "thriving": return ["#a9e4ff", "#eafaff"];
+    case "happy": return ["#bfeaff", "#eefbff"];
+    case "okay": return ["#cfe9f3", "#eef8fb"];
+    case "tired": return ["#dbe6ec", "#eef3f6"];
+    default: return ["#d7dee3", "#eef1f3"]; // unwell — softly grey
+  }
+}
+function healthColor(health) {
+  if (health >= 66) return "var(--good)";
+  if (health >= 40) return "var(--sun)";
+  return "var(--warn)";
+}
+
+/* ---------- "Did you know?" tips (grade 4–5 level) ---------- */
+const TIPS = [
+  "Your body is about 60% water — more than half of you is H₂O!",
+  "Your brain is nearly 75% water. Staying hydrated helps you think and remember.",
+  "Your kidneys are amazing filters — they clean your blood all day long, every single day.",
+  "When you feel thirsty, your body is already asking for water. Try to sip before you get super thirsty!",
+  "Water helps carry good stuff — like vitamins — all around your body.",
+  "Drinking enough water can help you feel less tired and less grumpy.",
+  "You lose a little water every time you breathe, sweat, or cry — so you need to refill!",
+  "Doing the same healthy routine every day makes it easier. Your brain loves habits!",
+  "Water has no sugar and no calories. It's the original, all-natural drink.",
+  "Fruits like watermelon and strawberries are full of water, so eating them helps you hydrate too.",
+  "Your muscles are about 75% water. Staying hydrated helps them work and play.",
+  "Taking your medicine at the same times each day helps it do its best work.",
+  "A grown-up is your teammate for staying healthy — ask them anything you're unsure about.",
+  "Even your bones hold water — they're about 30% water inside!",
+  "Sleep and water are best friends. Both help your body recharge for tomorrow.",
+  "Even a tiny bit of dehydration can make it harder to focus at school. Sip, sip, hooray!",
+  "Your skin is your biggest organ, and water helps keep it healthy and stretchy.",
+  "Cool fact: the liquid part of your blood is mostly water, and it delivers oxygen everywhere.",
+];
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+let state = loadState();
+let view = "home"; // "home" | "settings" | "history" | "rewards" | "customize"
+let editSettings = null;
+let customizeDraft = null;
+let historyMonth = null;
+let selectedDay = null;
+
+const root = document.getElementById("app");
+
+function go(v) { view = v; selectedDay = null; window.scrollTo(0, 0); render(); }
+
+function render() {
+  ensureToday();
+  root.innerHTML = "";
+  if (!state.setupDone) { root.appendChild(renderOnboarding()); return; }
+  if (view === "settings") { root.appendChild(renderSettings()); return; }
+  if (view === "history") { root.appendChild(renderHistory()); return; }
+  if (view === "rewards") { root.appendChild(renderRewards()); return; }
+  if (view === "customize") { root.appendChild(renderCustomize()); return; }
+  root.appendChild(renderHome());
+}
+
+/* shared back-header for sub-views */
+function topbarBack(title, action, actionLabel) {
+  return h("div", { class: "topbar" },
+    h("div", { class: "brand" },
+      h("button", { class: "icon-btn", "aria-label": "Back", onclick: () => go("home") }, "‹"),
+      h("span", null, title)
+    ),
+    action ? h("button", { class: "btn btn-good btn-mini", onclick: action }, actionLabel || "Save") : h("span")
+  );
+}
+
+/* ---------- Home ---------- */
+function renderHome() {
+  const w = wellness();
+  const set = state.settings;
+  const wrap = h("div");
+
+  // topbar
+  const streak = currentStreak() + (w.perfect ? 1 : 0);
+  const starCount = state.stars + (w.perfect ? 1 : 0);
+  wrap.appendChild(h("div", { class: "topbar" },
+    h("div", { class: "brand" },
+      logoEl(),
+      h("span", null, "Care", h("b", null, "Buddy"))
+    ),
+    h("div", { class: "topbar-right" },
+      h("button", { class: "icon-btn", "aria-label": "History", onclick: () => openHistory() }, "📅"),
+      h("button", { class: "icon-btn", "aria-label": "Rewards", onclick: () => go("rewards") }, "🏆"),
+      h("button", { class: "icon-btn", "aria-label": "Settings", onclick: openSettings }, gearSVG())
+    )
+  ));
+
+  // greeting
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : hour < 21 ? "Good evening" : "Good night";
+  wrap.appendChild(h("div", { class: "greeting" },
+    h("h1", null, part + (state.kidName ? ", " + state.kidName : "") + "!"),
+    h("p", null, prettyDate())
+  ));
+
+  // stats strip
+  wrap.appendChild(h("div", { class: "stats-strip" },
+    h("button", { class: "stat", onclick: () => openHistory() }, h("span", { class: "em" }, "🔥"), h("b", null, String(streak)), h("span", null, streak === 1 ? "day streak" : "day streak")),
+    h("button", { class: "stat", onclick: () => openHistory() }, h("span", { class: "em" }, "⭐"), h("b", null, String(starCount)), h("span", null, "stars")),
+    h("button", { class: "stat", onclick: () => go("rewards") }, h("span", { class: "em" }, "🏅"), h("b", null, String(state.stickers.length)), h("span", null, "stickers"))
+  ));
+
+  // buddy
+  const [skyTop, skyBot] = skyForMood(w.mood);
+  const [msg, emoji] = statusMessage(w);
+  const buddyCard = h("div", { class: "card buddy-card", style: { "--sky-top": skyTop, "--sky-bot": skyBot } },
+    h("button", { class: "customize-fab", "aria-label": "Customize buddy", onclick: () => openCustomize() }, "✏️"),
+    h("div", { class: "buddy-stage buddy-bob", id: "buddyStage", title: "Tap to customize",
+      onclick: () => openCustomize(),
+      html: buddySVG(w.mood, { thirsty: w.hydBehind, doseDue: !!(w.dueNow || w.lateNow) }) }),
+    h("div", { class: "buddy-status" }),
+    h("div", { class: "health-bar" }, h("div", { class: "health-fill", style: { width: w.health + "%", background: healthColor(w.health) } })),
+    h("div", { class: "health-label" }, healthWord(w.health) + " · " + w.health + "% healthy")
+  );
+  buddyCard.querySelector(".buddy-status").innerHTML =
+    emoji + " " + escapeHtml(msg).replace(escapeHtml(state.buddyName), '<span class="buddy-name">' + escapeHtml(state.buddyName) + "</span>");
+  wrap.appendChild(buddyCard);
+
+  // water
+  const pct = Math.max(0, Math.min(100, Math.round((state.today.water / set.waterGoal) * 100)));
+  const done = state.today.water >= set.waterGoal;
+  const unit = set.waterUnit;
+  wrap.appendChild(h("div", { class: "card water-card" },
+    h("div", { class: "row between" }, h("h2", null, "💧 Water"), h("span", { class: "sub" }, "Goal: " + set.waterGoal + " " + unit)),
+    h("div", { class: "row mt", style: { marginTop: "12px" } },
+      h("div", { class: "bottle-wrap" }, h("div", { class: "bottle" }, h("div", { class: "bottle-fill", id: "bottleFill", style: { height: pct + "%" } }))),
+      h("div", { class: "water-main" },
+        h("div", { class: "water-count", id: "waterCount" }, String(state.today.water), " ", h("small", null, "of " + set.waterGoal + " " + unit)),
+        h("div", { class: "water-goalmsg" + (done ? " done" : "") },
+          done ? "🎉 Goal reached — awesome!" : (set.waterGoal - state.today.water) + " " + unit + " to go"),
+        h("div", { class: "water-actions" },
+          h("button", { class: "btn btn-water", onclick: () => addWater(set.perTap) }, "+ Add " + (set.perTap === 1 ? "a " + singular(unit) : set.perTap + " " + unit)),
+          h("button", { class: "btn btn-ghost btn-mini", "aria-label": "Remove one", onclick: () => addWater(-set.perTap) }, "−")
+        )
+      )
+    )
+  ));
+
+  // medicine
+  wrap.appendChild(renderMedicine(w));
+
+  // tip
+  wrap.appendChild(h("div", { class: "card tip-card" },
+    h("div", { class: "tip-head" },
+      h("h2", null, "💡 Did you know?"),
+      h("button", { class: "icon-btn", style: { width: "34px", height: "34px" }, "aria-label": "New tip", onclick: shuffleTip }, "🔄")
+    ),
+    h("div", { class: "tip-body" }, TIPS[state.tipIndex % TIPS.length])
+  ));
+
+  // footer
+  wrap.appendChild(h("div", { class: "footer" },
+    h("div", null, "Care Buddy helps you build healthy habits — it isn't medical advice."),
+    h("div", null, "Always follow your care team's plan and ask a grown-up. 💛"),
+    h("div", { style: { marginTop: "6px", opacity: ".7" } }, "v" + VERSION + " · saved on this device only")
+  ));
+
+  return wrap;
+}
+
+function renderMedicine(w) {
+  const set = state.settings;
+  const card = h("div", { class: "card" });
+  card.appendChild(h("div", { class: "row between" }, h("h2", null, "💊 Medicine"), h("span", { class: "sub" }, "2 times a day")));
+
+  // timer box
+  const now = Date.now();
+  const sinceText = state.lastDoseAt ? fmtDur(now - state.lastDoseAt) : "—";
+  const next = nextDoseInfo();
+  card.appendChild(h("div", { class: "timer-box" },
+    h("div", { class: "timer-label" }, "Time since last dose"),
+    h("div", { class: "timer-big", id: "timerBig" }, state.lastDoseAt ? sinceText : "No doses logged yet"),
+    h("div", { class: "timer-next" + (next.late ? " late" : ""), id: "timerNext" }, next.text)
+  ));
+
+  // dose rows
+  card.appendChild(doseRow("am", "🌅", "Morning", set.doseAM, w));
+  card.appendChild(doseRow("pm", "🌙", "Evening", set.dosePM, w));
+
+  if (w.lateNow) {
+    card.appendChild(h("div", { class: "careteam-note" },
+      h("span", null, "⚠️"),
+      h("span", null, "The " + w.lateNow.label + " dose looks late. Don't guess — check with a grown-up or your care team about what to do.")
+    ));
+  }
+  return card;
+}
+
+function doseRow(key, ico, title, hhmm, w) {
+  const taken = state.today.doses[key];
+  const now = minutesNow();
+  const due = !taken && now >= parseHHMM(hhmm);
+  let metaClass = "dose-meta", meta;
+  if (taken) {
+    metaClass += " done";
+    const t = new Date(taken);
+    meta = "✓ Taken at " + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  } else if (due) {
+    metaClass += " due";
+    const late = now - parseHHMM(hhmm);
+    meta = late > 60 ? "Due now · " + Math.floor(late / 60) + "h " + (late % 60) + "m late" : "Due now (" + fmtClock(hhmm) + ")";
+  } else {
+    meta = "Scheduled for " + fmtClock(hhmm);
+  }
+
+  return h("div", { class: "dose" },
+    h("div", { class: "dose-ico" + (key === "am" ? " sun" : "") }, ico),
+    h("div", { class: "dose-info" },
+      h("div", { class: "dose-title" }, title + " · " + fmtClock(hhmm)),
+      h("div", { class: metaClass }, meta)
+    ),
+    taken
+      ? h("button", { class: "undo-link", onclick: () => undoDose(key) }, "Undo")
+      : h("button", { class: "check", "aria-label": "Mark " + title + " dose taken", onclick: () => markDose(key) }, "✓")
+  );
+}
+
+function nextDoseInfo() {
+  const set = state.settings;
+  const now = new Date();
+  const am = doseDateToday(set.doseAM), pm = doseDateToday(set.dosePM), amTom = doseDateToday(set.doseAM, 1);
+  // overdue untaken dose first
+  const t = state.today;
+  if (!t.doses.am && now >= am && (set.dosePM ? now < pm : true)) {
+    const late = Math.round((now - am) / 60000);
+    if (late > 0) return { text: "Morning dose is " + fmtDur(now - am) + " late", late: late > 60 };
+  }
+  if (!t.doses.pm && now >= pm) {
+    const late = Math.round((now - pm) / 60000);
+    if (late > 0) return { text: "Evening dose is " + fmtDur(now - pm) + " late", late: late > 60 };
+  }
+  // otherwise next upcoming
+  let next = null, label = "";
+  if (now < am) { next = am; label = "Morning " + fmtClock(set.doseAM); }
+  else if (now < pm) { next = pm; label = "Evening " + fmtClock(set.dosePM); }
+  else { next = amTom; label = "Morning " + fmtClock(set.doseAM) + " (tomorrow)"; }
+  return { text: "Next: " + label + " · in " + fmtDur(next - now), late: false };
+}
+
+/* ---------- actions ---------- */
+function addWater(n) {
+  state.today.water = Math.max(0, state.today.water + n);
+  save();
+  render();
+  if (n > 0) { const f = document.getElementById("bottleFill"); if (f) { const c = document.getElementById("waterCount"); if (c) { c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop"); } } }
+  checkCelebrate();
+  checkStickers();
+}
+function markDose(key) {
+  const ts = Date.now();
+  state.today.doses[key] = ts;
+  state.lastDoseAt = ts;
+  save();
+  render();
+  checkCelebrate();
+  checkStickers();
+}
+function undoDose(key) {
+  state.today.doses[key] = null;
+  // recompute lastDoseAt from remaining doses today (best-effort)
+  const times = Object.values(state.today.doses).filter(Boolean);
+  state.lastDoseAt = times.length ? Math.max(...times) : (state.lastDoseAt && !times.length ? state.lastDoseAt : null);
+  if (!times.length) {
+    // keep previous lastDoseAt only if it wasn't from this dose; simplest: clear if no doses today
+    state.lastDoseAt = null;
+  }
+  save();
+  render();
+}
+function shuffleTip() {
+  state.tipIndex = (state.tipIndex + 1 + Math.floor(Math.random() * (TIPS.length - 1))) % TIPS.length;
+  save();
+  render();
+}
+function checkCelebrate() {
+  const w = wellness();
+  if (w.perfect && !state.today.celebrated) {
+    state.today.celebrated = true;
+    save();
+    confetti();
+  }
+}
+
+/* ---------- Settings ---------- */
+function openSettings() { editSettings = JSON.parse(JSON.stringify(state.settings)); editSettings.kidName = state.kidName; editSettings.buddyName = state.buddyName; view = "settings"; render(); }
+function closeSettings() { view = "home"; render(); }
+
+function renderSettings() {
+  const s = editSettings;
+  const wrap = h("div");
+  wrap.appendChild(h("div", { class: "topbar" },
+    h("div", { class: "brand" }, h("button", { class: "icon-btn", "aria-label": "Back", onclick: closeSettings }, "‹"), h("span", null, "Settings")),
+    h("button", { class: "btn btn-good btn-mini", onclick: saveSettings }, "Save")
+  ));
+
+  wrap.appendChild(h("div", { class: "card" },
+    field("Your name", h("input", { type: "text", value: s.kidName || "", placeholder: "(optional)", oninput: e => s.kidName = e.target.value })),
+    field("Buddy's name", h("input", { type: "text", value: s.buddyName || "", placeholder: "Sunny", oninput: e => s.buddyName = e.target.value }))
+  ));
+
+  wrap.appendChild(h("button", { class: "btn btn-ghost btn-block", style: { marginBottom: "14px" }, onclick: () => openCustomize() }, "🎨 Customize how your buddy looks"));
+
+  wrap.appendChild(h("div", { class: "section-title" }, "Water goal"));
+  wrap.appendChild(h("div", { class: "card" },
+    h("div", { class: "field-row" },
+      field("Daily goal", h("input", { type: "number", min: "1", max: "30", value: s.waterGoal, oninput: e => s.waterGoal = clampInt(e.target.value, 1, 30, 6) })),
+      field("Unit", selectEl(["cups", "glasses", "bottles", "oz", "ml"], s.waterUnit, v => s.waterUnit = v))
+    ),
+    field("Each tap adds", h("input", { type: "number", min: "1", max: "32", value: s.perTap, oninput: e => s.perTap = clampInt(e.target.value, 1, 32, 1) })),
+    h("div", { class: "hint" }, "Set the goal to whatever your care team recommends — this isn't medical advice.")
+  ));
+
+  wrap.appendChild(h("div", { class: "section-title" }, "Medicine times"));
+  wrap.appendChild(h("div", { class: "card" },
+    h("div", { class: "field-row" },
+      field("Morning dose", h("input", { type: "time", value: s.doseAM, oninput: e => s.doseAM = e.target.value })),
+      field("Evening dose", h("input", { type: "time", value: s.dosePM, oninput: e => s.dosePM = e.target.value }))
+    ),
+    h("div", { class: "hint" }, "✈️ Traveling? Nudge both doses together, then fine-tune above:"),
+    h("div", { class: "quickshift" },
+      h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(-60) }, "−1 hr"),
+      h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(-30) }, "−30 min"),
+      h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(30) }, "+30 min"),
+      h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(60) }, "+1 hr")
+    ),
+    h("div", { class: "hint", id: "gapHint" }, gapText(s.doseAM, s.dosePM))
+  ));
+
+  wrap.appendChild(h("div", { class: "section-title" }, "About & data"));
+  wrap.appendChild(h("div", { class: "card" },
+    h("div", { class: "disclaimer" },
+      h("b", null, "A note for grown-ups: "),
+      "Care Buddy is a habit-and-reminder helper for kids. It does not give medical advice and won't tell anyone to change a dose. If a dose is missed, late, or you're unsure about anything, follow your care team's plan. Everything is stored only on this device."),
+    h("div", { class: "seg", style: { marginTop: "14px" } },
+      h("button", { class: "btn btn-ghost", onclick: exportData }, "⬇︎ Backup data"),
+      h("button", { class: "btn btn-ghost", onclick: importData }, "⬆︎ Restore")
+    ),
+    h("div", { class: "seg", style: { marginTop: "8px" } },
+      h("button", { class: "btn btn-danger btn-block", onclick: resetToday }, "Reset today's progress")
+    ),
+    h("div", { class: "seg", style: { marginTop: "8px" } },
+      h("button", { class: "btn btn-danger btn-block", onclick: resetAll }, "Erase everything & start over")
+    )
+  ));
+
+  wrap.appendChild(h("div", { class: "footer", style: { marginTop: "10px" } }, "Care Buddy v" + VERSION));
+  return wrap;
+}
+
+function field(label, input) { return h("div", { class: "field" }, h("label", null, label), input); }
+function selectEl(opts, val, on) {
+  const sel = h("select", { onchange: e => on(e.target.value) });
+  for (const o of opts) sel.appendChild(h("option", { value: o, selected: o === val ? "selected" : null }, o));
+  return sel;
+}
+function shiftDoses(min) {
+  editSettings.doseAM = shiftHHMM(editSettings.doseAM, min);
+  editSettings.dosePM = shiftHHMM(editSettings.dosePM, min);
+  render();
+}
+function shiftHHMM(hhmm, min) {
+  let m = (parseHHMM(hhmm) + min + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+}
+function gapText(am, pm) {
+  let gap = (parseHHMM(pm) - parseHHMM(am) + 1440) % 1440;
+  const hrs = Math.floor(gap / 60), mins = gap % 60;
+  return "Doses are " + hrs + "h" + (mins ? " " + mins + "m" : "") + " apart. Many plans aim for about 12 hours — follow your care team's.";
+}
+function saveSettings() {
+  const s = editSettings;
+  state.kidName = (s.kidName || "").trim();
+  state.buddyName = (s.buddyName || "").trim() || "Sunny";
+  state.settings = { waterGoal: s.waterGoal, waterUnit: s.waterUnit, perTap: s.perTap, doseAM: s.doseAM, dosePM: s.dosePM };
+  save();
+  closeSettings();
+}
+function resetToday() {
+  if (!confirm("Reset today's water and medicine check-marks?")) return;
+  state.today = { date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false };
+  save(); render();
+}
+function resetAll() {
+  if (!confirm("Erase ALL data (settings, history, stars) and start fresh? This can't be undone.")) return;
+  state = defaultState(); save(); view = "home"; render();
+}
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = h("a", { href: url, download: "care-buddy-backup-" + todayKey() + ".json" });
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function importData() {
+  const inp = h("input", { type: "file", accept: "application/json", style: { display: "none" } });
+  inp.addEventListener("change", async () => {
+    const f = inp.files[0]; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      if (!data || typeof data !== "object") throw 0;
+      state = Object.assign(defaultState(), data);
+      save(); view = "home"; render();
+      alert("Restored! 💛");
+    } catch { alert("Sorry, that file didn't look right."); }
+  });
+  document.body.appendChild(inp); inp.click(); inp.remove();
+}
+
+/* ---------- Onboarding (first run) ---------- */
+function renderOnboarding() {
+  const tmp = { kidName: "", buddyName: "Sunny", waterGoal: 6, waterUnit: "cups", doseAM: "08:00", dosePM: "20:00" };
+  const wrap = h("div");
+  wrap.appendChild(h("div", { class: "greeting", style: { paddingTop: "18px" } },
+    h("h1", null, "Hi there! 👋"),
+    h("p", null, "Let's set up your care buddy. (You can change all of this later.)")
+  ));
+  wrap.appendChild(h("div", { class: "card buddy-card", style: { "--sky-top": "#bfeaff", "--sky-bot": "#eafaff" } },
+    h("div", { class: "buddy-stage buddy-bob", html: buddySVG("happy", {}) }),
+    h("div", { class: "buddy-status" }, "Take care of your buddy by drinking water and taking your medicine on time!")
+  ));
+  wrap.appendChild(h("div", { class: "card" },
+    field("What's your name?", h("input", { type: "text", placeholder: "(optional)", oninput: e => tmp.kidName = e.target.value })),
+    field("What will you name your buddy?", h("input", { type: "text", value: "Sunny", oninput: e => tmp.buddyName = e.target.value })),
+    h("div", { class: "field-row" },
+      field("Water goal each day", h("input", { type: "number", min: "1", max: "30", value: 6, oninput: e => tmp.waterGoal = clampInt(e.target.value, 1, 30, 6) })),
+      field("Unit", selectEl(["cups", "glasses", "bottles", "oz", "ml"], "cups", v => tmp.waterUnit = v))
+    ),
+    h("div", { class: "field-row" },
+      field("Morning medicine", h("input", { type: "time", value: "08:00", oninput: e => tmp.doseAM = e.target.value })),
+      field("Evening medicine", h("input", { type: "time", value: "20:00", oninput: e => tmp.dosePM = e.target.value }))
+    ),
+    h("div", { class: "hint" }, "Tip for grown-ups: set the water goal and dose times to match the care team's plan."),
+    h("button", { class: "btn btn-good btn-block", style: { marginTop: "8px" }, onclick: () => finishOnboarding(tmp) }, "Let's go! ✨")
+  ));
+  wrap.appendChild(h("div", { class: "footer" }, "Everything you enter stays on this device only."));
+  return wrap;
+}
+function finishOnboarding(tmp) {
+  state.kidName = (tmp.kidName || "").trim();
+  state.buddyName = (tmp.buddyName || "").trim() || "Sunny";
+  state.settings.waterGoal = tmp.waterGoal;
+  state.settings.waterUnit = tmp.waterUnit;
+  state.settings.doseAM = tmp.doseAM;
+  state.settings.dosePM = tmp.dosePM;
+  state.setupDone = true;
+  save();
+  render();
+}
+
+/* ---------- little helpers ---------- */
+function clampInt(v, lo, hi, def) { v = parseInt(v, 10); if (isNaN(v)) return def; return Math.max(lo, Math.min(hi, v)); }
+function singular(u) { return u === "cups" ? "cup" : u === "glasses" ? "glass" : u === "bottles" ? "bottle" : u; }
+function healthWord(hp) { return hp >= 85 ? "Thriving" : hp >= 66 ? "Happy" : hp >= 46 ? "Doing okay" : hp >= 26 ? "Sleepy" : "Needs care"; }
+function prettyDate() { return new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }); }
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+/* color helpers (for buddy customization) */
+function hexToRgb(hex) { hex = String(hex).replace("#", ""); if (hex.length === 3) hex = hex.split("").map(c => c + c).join(""); const n = parseInt(hex, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function rgbToHex(r, g, b) { return "#" + [r, g, b].map(x => Math.max(0, Math.min(255, Math.round(x))).toString(16).padStart(2, "0")).join(""); }
+function mix(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return rgbToHex(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t); }
+function shade(hex, amt) { const [r, g, b] = hexToRgb(hex); const t = amt < 0 ? 0 : 255, k = Math.abs(amt); return rgbToHex(r + (t - r) * k, g + (t - g) * k, b + (t - b) * k); }
+
+function logoEl() { const d = h("span", { class: "logo" }); d.innerHTML = LOGO_SVG; return d; }
+const LOGO_SVG = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34b3ec"/><stop offset="1" stop-color="#1fb0bf"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M16 6 c5 7 7 9.5 7 12.5 a7 7 0 0 1 -14 0 C9 15.5 11 13 16 6z" fill="#fff"/><circle cx="13.5" cy="18" r="1.4" fill="#1fb0bf"/><circle cx="18.5" cy="18" r="1.4" fill="#1fb0bf"/><path d="M13 21 q3 2.5 6 0" stroke="#1fb0bf" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`;
+function gearSVG() { const s = h("span"); s.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a727c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`; return s; }
+
+/* ============================================================
+   Customize buddy
+   ============================================================ */
+const SKINS = ["#ffe0c2", "#f4c39a", "#e3a977", "#c8895a", "#a06b42", "#7a4f30"];
+const HAIRS = ["#2a1c14", "#6e4429", "#a8692d", "#d9b25e", "#b5402f", "#8a8f96"];
+const SHIRTS = ["#2bb3a6", "#39b6e8", "#7c5cff", "#ff8d6e", "#ffb01f", "#ff6fa3", "#4caf50"];
+
+function openCustomize() { customizeDraft = Object.assign({}, state.appearance); go("customize"); }
+function saveCustomize() { state.appearance = Object.assign({}, customizeDraft); save(); go("home"); }
+
+function swatchRow(label, opts, val, set) {
+  const row = h("div", { class: "swatches" });
+  for (const c of opts) row.appendChild(h("button", { class: "swatch" + (c === val ? " sel" : ""), style: { background: c }, "aria-label": label, onclick: () => { set(c); render(); } }));
+  return h("div", { class: "card" }, h("div", { class: "section-title", style: { margin: "0 0 10px" } }, label), row);
+}
+function renderCustomize() {
+  const ap = customizeDraft || (customizeDraft = Object.assign({}, state.appearance));
+  const wrap = h("div");
+  wrap.appendChild(topbarBack("Customize " + (state.buddyName || "buddy"), saveCustomize, "Save"));
+  wrap.appendChild(h("div", { class: "card buddy-card", style: { "--sky-top": "#bfeaff", "--sky-bot": "#eafaff" } },
+    h("div", { class: "buddy-stage buddy-bob", id: "customPreview", html: buddySVG("happy", {}, ap) })
+  ));
+  wrap.appendChild(swatchRow("Skin", SKINS, ap.skin, v => ap.skin = v));
+  wrap.appendChild(swatchRow("Hair", HAIRS, ap.hair, v => ap.hair = v));
+  wrap.appendChild(swatchRow("Shirt", SHIRTS, ap.shirt, v => ap.shirt = v));
+  wrap.appendChild(h("div", { class: "card" },
+    h("div", { class: "row between" },
+      h("div", { style: { fontWeight: "800", fontSize: "15px" } }, "👓 Glasses"),
+      h("button", { class: "toggle " + (ap.glasses ? "on" : "off"), onclick: () => { ap.glasses = !ap.glasses; render(); } }, ap.glasses ? "On" : "Off")
+    )
+  ));
+  return wrap;
+}
+
+/* ============================================================
+   History / calendar
+   ============================================================ */
+function openHistory() { const n = new Date(); historyMonth = { y: n.getFullYear(), m: n.getMonth() }; selectedDay = null; go("history"); }
+function prevMonth(y, m) { return m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }; }
+function nextMonth(y, m) { return m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }; }
+function statBig(em, val, label) { return h("div", { class: "stat-big" }, h("div", { class: "em" }, em), h("b", null, String(val)), h("span", null, label)); }
+function legendDot(kind, label) { return h("span", { style: { display: "inline-flex", alignItems: "center", gap: "5px" } }, h("span", { class: "cal-dot " + kind }), label); }
+
+function dayData(key) {
+  if (key === todayKey()) {
+    const t = state.today, g = state.settings.waterGoal;
+    return { water: t.water, goal: g, am: !!t.doses.am, pm: !!t.doses.pm, perfect: t.water >= g && !!t.doses.am && !!t.doses.pm, today: true };
+  }
+  return state.history[key] || null;
+}
+
+function renderHistory() {
+  const wrap = h("div");
+  wrap.appendChild(topbarBack("History", null));
+  const st = computeStats();
+  wrap.appendChild(h("div", { class: "card stats-card" },
+    statBig("🔥", st.streak, "Streak"),
+    statBig("🏆", st.bestStreak, "Best"),
+    statBig("⭐", st.stars, "Stars"),
+    statBig("✅", st.perfectDays, "Perfect")
+  ));
+
+  if (!historyMonth) { const n = new Date(); historyMonth = { y: n.getFullYear(), m: n.getMonth() }; }
+  const { y, m } = historyMonth;
+  const monthName = new Date(y, m, 1).toLocaleDateString([], { month: "long", year: "numeric" });
+  const now = new Date();
+  const atCurrent = (y === now.getFullYear() && m === now.getMonth());
+
+  const card = h("div", { class: "card" });
+  card.appendChild(h("div", { class: "cal-head" },
+    h("button", { class: "cal-nav", "aria-label": "Previous month", onclick: () => { historyMonth = prevMonth(y, m); selectedDay = null; render(); } }, "‹"),
+    h("div", { class: "m" }, monthName),
+    h("button", { class: "cal-nav", "aria-label": "Next month", disabled: atCurrent ? "disabled" : null, onclick: atCurrent ? null : () => { historyMonth = nextMonth(y, m); selectedDay = null; render(); } }, "›")
+  ));
+  const grid = h("div", { class: "cal-grid" });
+  for (const d of ["S", "M", "T", "W", "T", "F", "S"]) grid.appendChild(h("div", { class: "cal-dow" }, d));
+  const first = new Date(y, m, 1).getDay();
+  const dim = new Date(y, m + 1, 0).getDate();
+  for (let i = 0; i < first; i++) grid.appendChild(h("div", { class: "cal-cell empty" }));
+  for (let d = 1; d <= dim; d++) {
+    const key = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+    const data = dayData(key);
+    const cls = ["cal-cell"];
+    if (data) cls.push("has");
+    if (data && data.perfect) cls.push("perfect");
+    if (key === todayKey()) cls.push("today");
+    if (key === selectedDay) cls.push("sel");
+    const waterMet = data && data.water >= data.goal;
+    const medsMet = data && data.am && data.pm;
+    grid.appendChild(h("div", { class: cls.join(" "), onclick: data ? () => { selectedDay = (selectedDay === key ? null : key); render(); } : null },
+      data && data.perfect ? h("span", { class: "cal-star" }, "⭐") : null,
+      h("div", null, String(d)),
+      data
+        ? h("div", { class: "cal-dots" },
+            h("span", { class: "cal-dot" + (waterMet ? " water" : "") }),
+            h("span", { class: "cal-dot" + (medsMet ? " med" : "") }))
+        : h("div", { class: "cal-dots" })
+    ));
+  }
+  card.appendChild(grid);
+  card.appendChild(h("div", { class: "hint", style: { marginTop: "10px", display: "flex", gap: "14px", justifyContent: "center", flexWrap: "wrap" } },
+    legendDot("water", "water goal"), legendDot("med", "both doses"), h("span", null, "⭐ perfect day")
+  ));
+  if (selectedDay) {
+    const dd = dayData(selectedDay);
+    if (dd) {
+      const dt = keyToDate(selectedDay).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+      card.appendChild(h("div", { class: "day-detail" },
+        h("b", null, dt + (dd.today ? " (today)" : "")), h("br"),
+        "💧 " + dd.water + " / " + dd.goal + " " + state.settings.waterUnit + (dd.water >= dd.goal ? " ✓" : ""), h("br"),
+        "🌅 Morning " + (dd.am ? "✓" : "—") + "    🌙 Evening " + (dd.pm ? "✓" : "—"),
+        dd.perfect ? h("div", { style: { color: "var(--good)", fontWeight: "800", marginTop: "4px" } }, "⭐ Perfect day!") : null
+      ));
+    }
+  } else {
+    card.appendChild(h("div", { class: "hint", style: { textAlign: "center", marginTop: "8px" } }, "Tap a day to see details"));
+  }
+  wrap.appendChild(card);
+  return wrap;
+}
+
+/* ============================================================
+   Stats + sticker rewards
+   ============================================================ */
+function computeStats() {
+  let perfectDays = 0, waterDays = 0, medDays = 0, everDrank = false, tracked = 0;
+  for (const k in state.history) {
+    const d = state.history[k]; tracked++;
+    if (d.perfect) perfectDays++;
+    if (d.water >= d.goal) waterDays++;
+    if (d.am && d.pm) medDays++;
+    if (d.water > 0) everDrank = true;
+  }
+  const t = state.today, g = state.settings.waterGoal;
+  const todayPerfect = t.water >= g && !!t.doses.am && !!t.doses.pm;
+  if (t.water > 0) everDrank = true;
+  const streak = currentStreak() + (todayPerfect ? 1 : 0);
+  return {
+    perfectDays: perfectDays + (todayPerfect ? 1 : 0),
+    waterGoalDays: waterDays + (t.water >= g ? 1 : 0),
+    medDays: medDays + (t.doses.am && t.doses.pm ? 1 : 0),
+    everDrank, streak,
+    bestStreak: Math.max(state.bestStreak, streak),
+    stars: state.stars + (todayPerfect ? 1 : 0),
+    tracked,
+  };
+}
+
+const STICKERS = [
+  { id: "first-drop", emoji: "💧", name: "First Drop", desc: "Logged your first water!", hint: "Add some water", test: s => s.everDrank },
+  { id: "goal-getter", emoji: "🥤", name: "Goal Getter", desc: "Met your water goal", hint: "Reach your water goal", test: s => s.waterGoalDays >= 1 },
+  { id: "on-time", emoji: "⏰", name: "On Time", desc: "Both doses in one day", hint: "Take both doses in a day", test: s => s.medDays >= 1 },
+  { id: "perfect-day", emoji: "⭐", name: "Perfect Day", desc: "Water + both doses!", hint: "Have a perfect day", test: s => s.perfectDays >= 1 },
+  { id: "on-a-roll", emoji: "🔥", name: "On a Roll", desc: "3-day streak", hint: "Get a 3-day streak", test: s => s.bestStreak >= 3 },
+  { id: "week-warrior", emoji: "🌈", name: "Week Warrior", desc: "7-day streak", hint: "Get a 7-day streak", test: s => s.bestStreak >= 7 },
+  { id: "two-week", emoji: "🏆", name: "Two-Week Champ", desc: "14-day streak", hint: "Get a 14-day streak", test: s => s.bestStreak >= 14 },
+  { id: "star-collector", emoji: "✨", name: "Star Collector", desc: "Earned 10 stars", hint: "Earn 10 stars", test: s => s.stars >= 10 },
+  { id: "superstar", emoji: "🌟", name: "Superstar", desc: "Earned 30 stars", hint: "Earn 30 stars", test: s => s.stars >= 30 },
+  { id: "hydration-hero", emoji: "💎", name: "Hydration Hero", desc: "Water goal 10 days", hint: "Hit water goal 10 days", test: s => s.waterGoalDays >= 10 },
+  { id: "med-master", emoji: "🛡️", name: "Medicine Master", desc: "Both doses 10 days", hint: "Both doses on 10 days", test: s => s.medDays >= 10 },
+  { id: "monthly-marvel", emoji: "👑", name: "Monthly Marvel", desc: "30 perfect days", hint: "Reach 30 perfect days", test: s => s.perfectDays >= 30 },
+];
+
+function evaluateStickers() { const s = computeStats(); return STICKERS.filter(x => x.test(s)).map(x => x.id); }
+function checkStickers(silent) {
+  const fresh = evaluateStickers().filter(id => !state.stickers.includes(id));
+  if (!fresh.length) return;
+  state.stickers.push(...fresh);
+  save();
+  if (!silent) {
+    const st = STICKERS.find(x => x.id === fresh[0]);
+    toast("New sticker! " + st.emoji + " " + st.name);
+    confetti();
+  }
+  render();
+}
+
+function renderRewards() {
+  const wrap = h("div");
+  wrap.appendChild(topbarBack("Rewards", null));
+  const earned = new Set(state.stickers);
+  wrap.appendChild(h("div", { class: "card center" },
+    h("div", { class: "rewards-progress" }, "🏅 " + earned.size + " of " + STICKERS.length + " stickers collected!")
+  ));
+  const grid = h("div", { class: "sticker-grid" });
+  for (const s of STICKERS) {
+    const got = earned.has(s.id);
+    grid.appendChild(h("div", { class: "sticker " + (got ? "got" : "locked") },
+      h("div", { class: "sticker-emoji" }, got ? s.emoji : "🔒"),
+      h("div", { class: "sticker-name" }, got ? s.name : "Locked"),
+      h("div", { class: "sticker-desc" }, got ? s.desc : s.hint)
+    ));
+  }
+  wrap.appendChild(h("div", { class: "card" }, grid));
+  return wrap;
+}
+
+function toast(msg) { const t = h("div", { class: "toast" }, msg); document.body.appendChild(t); setTimeout(() => t.remove(), 3200); }
+
+/* ---------- confetti ---------- */
+function confetti() {
+  const wrap = h("div", { class: "confetti" });
+  const items = ["⭐", "💧", "🎉", "💛", "✨"];
+  for (let i = 0; i < 28; i++) {
+    const s = h("span", null, items[i % items.length]);
+    s.style.left = Math.random() * 100 + "%";
+    s.style.animationDuration = (1.6 + Math.random() * 1.4) + "s";
+    s.style.animationDelay = (Math.random() * 0.4) + "s";
+    s.style.fontSize = (16 + Math.random() * 16) + "px";
+    wrap.appendChild(s);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 3200);
+}
+
+/* ---------- live timer tick (home only) ---------- */
+setInterval(() => {
+  if (view !== "home" || !state.setupDone) return;
+  const big = document.getElementById("timerBig");
+  const nx = document.getElementById("timerNext");
+  if (big && state.lastDoseAt) big.textContent = fmtDur(Date.now() - state.lastDoseAt);
+  if (nx) { const n = nextDoseInfo(); nx.textContent = n.text; nx.classList.toggle("late", !!n.late); }
+}, 20000);
+// re-render fully every 5 min so mood/due states refresh
+setInterval(() => { if (view === "home" && state.setupDone) render(); }, 300000);
+// refresh when app comes back to foreground
+document.addEventListener("visibilitychange", () => { if (!document.hidden && view === "home") render(); });
+
+/* ---------- service worker (offline) — skipped on localhost so dev always shows latest ---------- */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(location.hostname)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+
+render();
+checkStickers(true);
+</script>
+</body>
+</html>
