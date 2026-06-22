@@ -318,6 +318,43 @@
   }
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 14px); } }
   @keyframes toastOut { to { opacity: 0; transform: translate(-50%, 14px); } }
+
+  /* ---------- edition flags ---------- */
+  .brand .flags { font-size: 15px; margin-left: 3px; letter-spacing: -1px; }
+  .edition { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+
+  /* ---------- all-goals streak banner ---------- */
+  .streak-banner {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: linear-gradient(180deg, #fff1d6, #fff8ea); border: 1px solid #ffdf9e;
+    color: #a9620a; font-weight: 800; font-size: 14.5px; border-radius: 16px;
+    padding: 11px 14px; margin: 0 0 14px; text-align: center;
+  }
+
+  /* ---------- dose editing + timezone ---------- */
+  .dose-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+  .dose-clock { width: 40px; height: 40px; font-size: 16px; }
+  .dose-editing { flex-wrap: wrap; align-items: flex-start; }
+  .dose-edit-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+  .dose-edit-row input[type="time"] { width: auto; flex: 0 0 auto; padding: 9px 11px; font-size: 15px; }
+  .dose-edit-actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding-top: 2px; }
+  .tz-chip { font-size: 11px; font-weight: 800; color: var(--med); background: var(--med-soft); border-radius: 999px; padding: 4px 9px; white-space: nowrap; }
+  .tz-line { font-size: 11.5px; font-weight: 700; color: #6a52cc; margin-top: 8px; }
+
+  /* ---------- travel zones ---------- */
+  .travel-zones { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; margin-top: 10px; }
+  .tz-now { font-weight: 800; font-size: 13.5px; margin-bottom: 7px; }
+  .zone-row { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; font-weight: 700; padding: 3px 0; }
+  .zone-row .z { color: var(--muted); font-weight: 700; }
+
+  /* ---------- pet companion ---------- */
+  .buddy-pet { position: absolute; left: -4px; bottom: -2px; width: 78px; z-index: 3; }
+  .buddy-pet svg { width: 100%; height: auto; display: block; }
+  .pet-grid { display: flex; gap: 9px; }
+  .pet-tile { flex: 1; min-width: 60px; border: 2px solid var(--border); border-radius: 14px; background: var(--surface-2); padding: 9px 4px 7px; cursor: pointer; text-align: center; }
+  .pet-tile.sel { border-color: var(--accent); background: var(--accent-soft); }
+  .pet-tile .pet-emoji { font-size: 25px; line-height: 1; }
+  .pet-tile .pet-name { font-size: 11.5px; font-weight: 800; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -331,7 +368,7 @@
    It is NOT medical advice. Always follow the care team's plan.
    ============================================================ */
 
-const VERSION = "1.0";
+const VERSION = "1.1";
 const STORAGE_KEY = "care-buddy-v1";
 
 /* ---------- tiny DOM helper ---------- */
@@ -379,9 +416,42 @@ function defaultState() {
     stars: 0,
     bestStreak: 0,
     tipIndex: 0,
-    appearance: { skin: "#f4c39a", hair: "#6e4429", shirt: "#2bb3a6", glasses: false },
+    appearance: { skin: "#f4c39a", hair: "#6e4429", shirt: "#2bb3a6", glasses: false, pet: "none" },
     stickers: [],
   };
+}
+
+/* Coerce any loaded/imported blob into a safe, complete state shape.
+   Used by BOTH loadState() and importData() so restores can't crash or inject. */
+function sanitizeAppearance(ap) {
+  const d = defaultState().appearance;
+  ap = (ap && typeof ap === "object") ? ap : {};
+  const hex = v => (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v)) ? v : null;
+  return {
+    skin: hex(ap.skin) || d.skin,
+    hair: hex(ap.hair) || d.hair,
+    shirt: hex(ap.shirt) || d.shirt,
+    glasses: !!ap.glasses,
+    pet: ["none", "cat", "dog", "bunny"].includes(ap.pet) ? ap.pet : "none",
+  };
+}
+function normalizeState(data) {
+  const def = defaultState();
+  const s = Object.assign(def, (data && typeof data === "object") ? data : {});
+  s.settings = Object.assign(defaultState().settings, s.settings || {});
+  s.settings.waterGoal = clampInt(s.settings.waterGoal, 1, 30, 6);
+  s.settings.perTap = clampInt(s.settings.perTap, 1, 32, 1);
+  if (typeof s.settings.doseAM !== "string") s.settings.doseAM = "08:00";
+  if (typeof s.settings.dosePM !== "string") s.settings.dosePM = "20:00";
+  s.appearance = sanitizeAppearance(s.appearance);
+  if (!Array.isArray(s.stickers)) s.stickers = [];
+  if (typeof s.history !== "object" || !s.history) s.history = {};
+  s.today = Object.assign({ date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false }, s.today || {});
+  s.today.water = Math.max(0, Number(s.today.water) || 0);
+  s.today.doses = Object.assign({ am: null, pm: null }, s.today.doses || {});
+  for (const k of ["am", "pm"]) s.today.doses[k] = Number.isFinite(s.today.doses[k]) ? s.today.doses[k] : null;
+  if (!Number.isFinite(s.lastDoseAt)) s.lastDoseAt = null;
+  return s;
 }
 
 function loadState() {
@@ -389,15 +459,7 @@ function loadState() {
   if (storageOK) { try { raw = localStorage.getItem(STORAGE_KEY); } catch {} }
   else if (memoryState) return memoryState;
   if (!raw) return defaultState();
-  try {
-    const s = Object.assign(defaultState(), JSON.parse(raw));
-    s.settings = Object.assign(defaultState().settings, s.settings || {});
-    s.appearance = Object.assign(defaultState().appearance, s.appearance || {});
-    if (!Array.isArray(s.stickers)) s.stickers = [];
-    s.today = Object.assign({ date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false }, s.today || {});
-    s.today.doses = Object.assign({ am: null, pm: null }, s.today.doses || {});
-    return s;
-  } catch { return defaultState(); }
+  try { return normalizeState(JSON.parse(raw)); } catch { return defaultState(); }
 }
 
 function save() {
@@ -430,6 +492,18 @@ function fmtDur(ms) {
   if (mins > 0) return mins + "m";
   return "just now";
 }
+/* timezone display + dose-time editing helpers */
+function tzName() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { return ""; } }
+function tzAbbr(d = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat([], { timeZoneName: "short", hour: "numeric" }).formatToParts(d);
+    const p = parts.find(x => x.type === "timeZoneName");
+    return p ? p.value : "";
+  } catch { return ""; }
+}
+function fmtTimeTZ(ts) { const d = new Date(ts); return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " " + tzAbbr(d); }
+function hhmmFromTs(ts) { const d = new Date(ts); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+function tsFromHHMMToday(hhmm) { const d = new Date(); d.setHours(0, 0, 0, 0); d.setMinutes(parseHHMM(hhmm)); return d.getTime(); }
 
 /* ---------- daily rollover + streak ---------- */
 function ensureToday() {
@@ -662,6 +736,71 @@ function buddySVG(mood, flags, appe) {
   </svg>`;
 }
 
+/* optional pet companion — sits beside the buddy, reacts to mood */
+function petSVG(type, happy) {
+  if (!type || type === "none") return "";
+  const L = "#4a4038";
+  const eyes = happy
+    ? `<circle cx="33" cy="40" r="2.8" fill="#3a322c"/><circle cx="47" cy="40" r="2.8" fill="#3a322c"/><circle cx="32" cy="39" r="0.9" fill="#fff"/><circle cx="46" cy="39" r="0.9" fill="#fff"/>`
+    : `<path d="M30 41 q3 -3 6 0" stroke="#3a322c" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M44 41 q3 -3 6 0" stroke="#3a322c" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  const smile = happy
+    ? `<path d="M34 48 q6 6 12 0" stroke="${L}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`
+    : `<path d="M35 50 q5 -3 10 0" stroke="${L}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
+
+  if (type === "cat") {
+    const C = "#9aa6ad", P = "#ef9aa6";
+    return `<svg viewBox="0 0 80 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="pet cat">
+      <path d="M40 82 q-22 0 -22 -17 q0 -14 22 -14 q22 0 22 14 q0 17 -22 17 z" fill="${C}" stroke="${L}" stroke-width="2"/>
+      <path d="M60 70 q15 1 12 -18" fill="none" stroke="${L}" stroke-width="6.5" stroke-linecap="round"/>
+      <path d="M60 70 q15 1 12 -18" fill="none" stroke="${C}" stroke-width="4" stroke-linecap="round"/>
+      <path d="M25 30 l-4 -17 17 9 z" fill="${C}" stroke="${L}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M55 30 l4 -17 -17 9 z" fill="${C}" stroke="${L}" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M26 26 l-2 -8 8 4 z" fill="${P}"/>
+      <path d="M54 26 l2 -8 -8 4 z" fill="${P}"/>
+      <circle cx="40" cy="42" r="18" fill="${C}" stroke="${L}" stroke-width="2"/>
+      ${eyes}
+      <path d="M37 45 l3 3 3 -3 z" fill="${P}"/>
+      ${smile}
+      <g stroke="${L}" stroke-width="1" stroke-linecap="round" opacity=".65"><path d="M28 46 l-13 -2"/><path d="M28 49 l-13 3"/><path d="M52 46 l13 -2"/><path d="M52 49 l13 3"/></g>
+    </svg>`;
+  }
+  if (type === "dog") {
+    const C = "#cda06a", CD = "#a87f4c", SN = "#f0e4d0", T = "#f08a9a";
+    return `<svg viewBox="0 0 80 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="pet dog">
+      <path d="M40 82 q-22 0 -22 -17 q0 -14 22 -14 q22 0 22 14 q0 17 -22 17 z" fill="${C}" stroke="${L}" stroke-width="2"/>
+      <path d="M22 32 q-13 0 -13 16 q0 11 12 10 q3 -18 7 -24 z" fill="${CD}" stroke="${L}" stroke-width="2"/>
+      <path d="M58 32 q13 0 13 16 q0 11 -12 10 q-3 -18 -7 -24 z" fill="${CD}" stroke="${L}" stroke-width="2"/>
+      <circle cx="40" cy="42" r="18" fill="${C}" stroke="${L}" stroke-width="2"/>
+      <ellipse cx="40" cy="50" rx="12" ry="9.5" fill="${SN}" stroke="${L}" stroke-width="1.5"/>
+      ${eyes}
+      <ellipse cx="40" cy="46" rx="3.6" ry="2.8" fill="#3a322c"/>
+      <path d="M40 48 v4" stroke="${L}" stroke-width="1.4" stroke-linecap="round"/>
+      ${happy
+        ? `<path d="M40 52 q-5 2 -5 8 q5 1 5 -2 q0 3 5 2 q0 -6 -5 -8 z" fill="${T}" stroke="${L}" stroke-width="1.1"/>`
+        : `<path d="M35 54 q5 -2 10 0" stroke="${L}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`}
+    </svg>`;
+  }
+  // bunny
+  const C = "#f5f2ef", P = "#f0a9b6";
+  return `<svg viewBox="0 0 80 84" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="pet bunny">
+    <path d="M40 82 q-20 0 -20 -16 q0 -13 20 -13 q20 0 20 13 q0 16 -20 16 z" fill="${C}" stroke="${L}" stroke-width="2"/>
+    <ellipse cx="31" cy="20" rx="6.5" ry="19" fill="${C}" stroke="${L}" stroke-width="2"/>
+    <ellipse cx="49" cy="20" rx="6.5" ry="19" fill="${C}" stroke="${L}" stroke-width="2"/>
+    <ellipse cx="31" cy="21" rx="2.8" ry="13" fill="${P}"/>
+    <ellipse cx="49" cy="21" rx="2.8" ry="13" fill="${P}"/>
+    <circle cx="40" cy="46" r="17" fill="${C}" stroke="${L}" stroke-width="2"/>
+    ${happy
+      ? `<circle cx="33" cy="44" r="2.8" fill="#3a322c"/><circle cx="47" cy="44" r="2.8" fill="#3a322c"/><circle cx="32" cy="43" r="0.9" fill="#fff"/><circle cx="46" cy="43" r="0.9" fill="#fff"/>`
+      : `<path d="M30 45 q3 -3 6 0" stroke="#3a322c" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M44 45 q3 -3 6 0" stroke="#3a322c" stroke-width="2" fill="none" stroke-linecap="round"/>`}
+    <path d="M37 49 l3 3 3 -3 z" fill="${P}"/>
+    ${happy
+      ? `<path d="M34 53 q6 5 12 0" stroke="${L}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`
+      : `<path d="M35 54 q5 -3 10 0" stroke="${L}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`}
+    <g stroke="${L}" stroke-width="1" stroke-linecap="round" opacity=".6"><path d="M30 51 l-11 -1"/><path d="M50 51 l11 -1"/></g>
+  </svg>`;
+}
+function petEl(type, happy) { if (!type || type === "none") return null; return h("div", { class: "buddy-pet", html: petSVG(type, happy) }); }
+
 function skyForMood(mood) {
   switch (mood) {
     case "thriving": return ["#a9e4ff", "#eafaff"];
@@ -708,6 +847,7 @@ let editSettings = null;
 let customizeDraft = null;
 let historyMonth = null;
 let selectedDay = null;
+let editingDose = null;
 
 const root = document.getElementById("app");
 
@@ -747,7 +887,8 @@ function renderHome() {
   wrap.appendChild(h("div", { class: "topbar" },
     h("div", { class: "brand" },
       logoEl(),
-      h("span", null, "Care", h("b", null, "Buddy"))
+      h("span", null, "Care", h("b", null, "Buddy")),
+      h("span", { class: "flags", title: "France & Greece edition" }, "🇫🇷🇬🇷")
     ),
     h("div", { class: "topbar-right" },
       h("button", { class: "icon-btn", "aria-label": "History", onclick: () => openHistory() }, "📅"),
@@ -778,14 +919,23 @@ function renderHome() {
     h("button", { class: "customize-fab", "aria-label": "Customize buddy", onclick: () => openCustomize() }, "✏️"),
     h("div", { class: "buddy-stage buddy-bob", id: "buddyStage", title: "Tap to customize",
       onclick: () => openCustomize(),
-      html: buddySVG(w.mood, { thirsty: w.hydBehind, doseDue: !!(w.dueNow || w.lateNow) }) }),
+      html: buddySVG(w.mood, { thirsty: w.hydBehind, doseDue: !!(w.dueNow || w.lateNow) }) },
+      petEl(state.appearance.pet, w.health >= 46)),
     h("div", { class: "buddy-status" }),
     h("div", { class: "health-bar" }, h("div", { class: "health-fill", style: { width: w.health + "%", background: healthColor(w.health) } })),
     h("div", { class: "health-label" }, healthWord(w.health) + " · " + w.health + "% healthy")
   );
   buddyCard.querySelector(".buddy-status").innerHTML =
-    emoji + " " + escapeHtml(msg).replace(escapeHtml(state.buddyName), '<span class="buddy-name">' + escapeHtml(state.buddyName) + "</span>");
+    emoji + " " + escapeHtml(msg).replace(escapeHtml(state.buddyName), () => '<span class="buddy-name">' + escapeHtml(state.buddyName) + "</span>");
   wrap.appendChild(buddyCard);
+
+  // all-goals streak banner
+  if (streak >= 1) {
+    wrap.appendChild(h("div", { class: "streak-banner" },
+      "🔥 " + (streak === 1
+        ? "1 day — all goals hit! Keep it going!"
+        : streak + " days in a row hitting all your goals!")));
+  }
 
   // water
   const pct = Math.max(0, Math.min(100, Math.round((state.today.water / set.waterGoal) * 100)));
@@ -823,7 +973,8 @@ function renderHome() {
   wrap.appendChild(h("div", { class: "footer" },
     h("div", null, "Care Buddy helps you build healthy habits — it isn't medical advice."),
     h("div", null, "Always follow your care team's plan and ask a grown-up. 💛"),
-    h("div", { style: { marginTop: "6px", opacity: ".7" } }, "v" + VERSION + " · saved on this device only")
+    h("div", { class: "edition", style: { marginTop: "5px" } }, "🇫🇷 France & Greece edition 🇬🇷"),
+    h("div", { style: { marginTop: "3px", opacity: ".7" } }, "v" + VERSION + " · saved on this device only")
   ));
 
   return wrap;
@@ -841,7 +992,8 @@ function renderMedicine(w) {
   card.appendChild(h("div", { class: "timer-box" },
     h("div", { class: "timer-label" }, "Time since last dose"),
     h("div", { class: "timer-big", id: "timerBig" }, state.lastDoseAt ? sinceText : "No doses logged yet"),
-    h("div", { class: "timer-next" + (next.late ? " late" : ""), id: "timerNext" }, next.text)
+    h("div", { class: "timer-next" + (next.late ? " late" : ""), id: "timerNext" }, next.text),
+    h("div", { class: "tz-line" }, "🕐 Times shown in " + tzAbbr() + (tzName() ? " · " + tzName() : ""))
   ));
 
   // dose rows
@@ -861,11 +1013,31 @@ function doseRow(key, ico, title, hhmm, w) {
   const taken = state.today.doses[key];
   const now = minutesNow();
   const due = !taken && now >= parseHHMM(hhmm);
+
+  // inline time editor
+  if (editingDose === key) {
+    let val = taken ? hhmmFromTs(taken) : hhmmFromTs(Date.now());
+    return h("div", { class: "dose dose-editing" },
+      h("div", { class: "dose-ico" + (key === "am" ? " sun" : "") }, ico),
+      h("div", { class: "dose-info" },
+        h("div", { class: "dose-title" }, "What time was the " + title.toLowerCase() + " dose taken today?"),
+        h("div", { class: "dose-edit-row" },
+          h("input", { type: "time", value: val, oninput: e => val = e.target.value }),
+          h("span", { class: "tz-chip" }, tzAbbr())
+        ),
+        h("div", { class: "hint", style: { marginTop: "5px" } }, "Records today. A time later than now saves as right now.")
+      ),
+      h("div", { class: "dose-edit-actions" },
+        h("button", { class: "btn btn-good btn-mini", onclick: () => saveDoseTime(key, val) }, "Save"),
+        h("button", { class: "undo-link", onclick: () => { editingDose = null; render(); } }, "Cancel")
+      )
+    );
+  }
+
   let metaClass = "dose-meta", meta;
   if (taken) {
     metaClass += " done";
-    const t = new Date(taken);
-    meta = "✓ Taken at " + t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    meta = "✓ Taken at " + fmtTimeTZ(taken);
   } else if (due) {
     metaClass += " due";
     const late = now - parseHHMM(hhmm);
@@ -881,8 +1053,12 @@ function doseRow(key, ico, title, hhmm, w) {
       h("div", { class: metaClass }, meta)
     ),
     taken
-      ? h("button", { class: "undo-link", onclick: () => undoDose(key) }, "Undo")
-      : h("button", { class: "check", "aria-label": "Mark " + title + " dose taken", onclick: () => markDose(key) }, "✓")
+      ? h("div", { class: "dose-actions" },
+          h("button", { class: "undo-link", onclick: () => startEditDose(key) }, "Edit time"),
+          h("button", { class: "undo-link", onclick: () => undoDose(key) }, "Undo"))
+      : h("div", { class: "dose-actions" },
+          h("button", { class: "icon-btn dose-clock", "aria-label": "Log " + title + " dose at a specific time", title: "Log at a specific time", onclick: () => startEditDose(key) }, "🕐"),
+          h("button", { class: "check", "aria-label": "Mark " + title + " dose taken now", onclick: () => markDose(key) }, "✓"))
   );
 }
 
@@ -918,23 +1094,33 @@ function addWater(n) {
   checkStickers();
 }
 function markDose(key) {
-  const ts = Date.now();
-  state.today.doses[key] = ts;
-  state.lastDoseAt = ts;
+  state.today.doses[key] = Date.now();
+  recomputeLastDose();
   save();
   render();
   checkCelebrate();
   checkStickers();
 }
+function startEditDose(key) { editingDose = key; render(); }
+function saveDoseTime(key, hhmm) {
+  if (!hhmm) { editingDose = null; render(); return; }
+  // a logged dose is always in the past — never store a future time
+  state.today.doses[key] = Math.min(tsFromHHMMToday(hhmm), Date.now());
+  editingDose = null;
+  recomputeLastDose();
+  save();
+  render();
+  checkCelebrate();
+  checkStickers();
+}
+function recomputeLastDose() {
+  const times = Object.values(state.today.doses).filter(Boolean);
+  if (times.length) state.lastDoseAt = Math.min(Math.max(...times), Date.now());
+}
 function undoDose(key) {
   state.today.doses[key] = null;
-  // recompute lastDoseAt from remaining doses today (best-effort)
   const times = Object.values(state.today.doses).filter(Boolean);
-  state.lastDoseAt = times.length ? Math.max(...times) : (state.lastDoseAt && !times.length ? state.lastDoseAt : null);
-  if (!times.length) {
-    // keep previous lastDoseAt only if it wasn't from this dose; simplest: clear if no doses today
-    state.lastDoseAt = null;
-  }
+  state.lastDoseAt = times.length ? Math.max(...times) : null;
   save();
   render();
 }
@@ -993,6 +1179,12 @@ function renderSettings() {
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(-30) }, "−30 min"),
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(30) }, "+30 min"),
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(60) }, "+1 hr")
+    ),
+    h("div", { class: "travel-zones" },
+      h("div", { class: "tz-now" }, "🕐 You're in " + tzAbbr() + (tzName() ? " · " + tzName() : "")),
+      h("div", { class: "zone-row" }, h("span", null, "🇫🇷 France"), h("span", { class: "z" }, "CET / CEST")),
+      h("div", { class: "zone-row" }, h("span", null, "🇬🇷 Greece"), h("span", { class: "z" }, "EET / EEST")),
+      h("div", { class: "hint", style: { marginTop: "6px" } }, "Greece runs 1 hour ahead of France. Try to keep the two doses about 12 hours apart — follow your care team's plan.")
     ),
     h("div", { class: "hint", id: "gapHint" }, gapText(s.doseAM, s.dosePM))
   ));
@@ -1068,7 +1260,7 @@ function importData() {
     try {
       const data = JSON.parse(await f.text());
       if (!data || typeof data !== "object") throw 0;
-      state = Object.assign(defaultState(), data);
+      state = normalizeState(data);
       save(); view = "home"; render();
       alert("Restored! 💛");
     } catch { alert("Sorry, that file didn't look right."); }
@@ -1154,7 +1346,7 @@ function renderCustomize() {
   const wrap = h("div");
   wrap.appendChild(topbarBack("Customize " + (state.buddyName || "buddy"), saveCustomize, "Save"));
   wrap.appendChild(h("div", { class: "card buddy-card", style: { "--sky-top": "#bfeaff", "--sky-bot": "#eafaff" } },
-    h("div", { class: "buddy-stage buddy-bob", id: "customPreview", html: buddySVG("happy", {}, ap) })
+    h("div", { class: "buddy-stage buddy-bob", id: "customPreview", html: buddySVG("happy", {}, ap) }, petEl(ap.pet, true))
   ));
   wrap.appendChild(swatchRow("Skin", SKINS, ap.skin, v => ap.skin = v));
   wrap.appendChild(swatchRow("Hair", HAIRS, ap.hair, v => ap.hair = v));
@@ -1165,6 +1357,13 @@ function renderCustomize() {
       h("button", { class: "toggle " + (ap.glasses ? "on" : "off"), onclick: () => { ap.glasses = !ap.glasses; render(); } }, ap.glasses ? "On" : "Off")
     )
   ));
+  const pets = [["none", "🚫", "None"], ["cat", "🐱", "Cat"], ["dog", "🐶", "Dog"], ["bunny", "🐰", "Bunny"]];
+  const petGrid = h("div", { class: "pet-grid" });
+  for (const [val, em, name] of pets) {
+    petGrid.appendChild(h("div", { class: "pet-tile" + (ap.pet === val ? " sel" : ""), onclick: () => { ap.pet = val; render(); } },
+      h("div", { class: "pet-emoji" }, em), h("div", { class: "pet-name" }, name)));
+  }
+  wrap.appendChild(h("div", { class: "card" }, h("div", { class: "section-title", style: { margin: "0 0 10px" } }, "🐾 Pet companion"), petGrid));
   return wrap;
 }
 
