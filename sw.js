@@ -1,5 +1,5 @@
 /* Care Buddy service worker — makes the app work offline once installed. */
-const CACHE = "care-buddy-v2";
+const CACHE = "care-buddy-v3";
 const ASSETS = [
   "./",
   "./index.html",

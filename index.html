@@ -355,6 +355,48 @@
   .pet-tile.sel { border-color: var(--accent); background: var(--accent-soft); }
   .pet-tile .pet-emoji { font-size: 25px; line-height: 1; }
   .pet-tile .pet-name { font-size: 11.5px; font-weight: 800; margin-top: 3px; }
+
+  /* ---------- reminder nudge ---------- */
+  .nudge-banner {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 14px; border-radius: 16px;
+    padding: 12px 14px; font-weight: 800; font-size: 14px;
+    background: linear-gradient(180deg, #ece6ff, #f6f3ff); border: 1px solid #d8ccff; color: #5a3fd0;
+    animation: nudgePulse 2.2s ease-in-out infinite;
+  }
+  .nudge-banner.late { background: linear-gradient(180deg, #fdeede, #fff7ec); border-color: #f3d3a0; color: #b3650a; }
+  .nudge-emoji { font-size: 21px; }
+  @keyframes nudgePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(124,92,255,.16); } 50% { box-shadow: 0 0 0 8px rgba(124,92,255,0); } }
+  .buddy-attention { animation: wiggle 1.3s ease-in-out infinite; transform-origin: 50% 85%; }
+  @keyframes wiggle { 0%,100% { transform: rotate(0deg); } 25% { transform: rotate(-3.5deg); } 75% { transform: rotate(3.5deg); } }
+
+  /* ---------- profile switcher ---------- */
+  .profile-bar { display: flex; gap: 8px; padding: 0 2px 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .profile-pill {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 7px; cursor: pointer; font-family: inherit;
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 999px; padding: 5px 14px 5px 6px; font-weight: 800; font-size: 14px; box-shadow: var(--shadow-sm);
+  }
+  .profile-pill.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); }
+  .av { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex: 0 0 auto; }
+  .profile-add { flex: 0 0 auto; min-width: 40px; border-radius: 999px; border: 1.5px dashed var(--border); background: var(--surface); font-size: 18px; font-weight: 800; color: var(--muted); cursor: pointer; }
+
+  .prof-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-top: 1px solid var(--border); }
+  .prof-row:first-child { border-top: none; }
+  .prof-row .av { width: 36px; height: 36px; font-size: 14px; }
+  .prof-row .pinfo { flex: 1; min-width: 0; }
+  .prof-row .pname { font-weight: 800; font-size: 14.5px; }
+  .prof-row .psub { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 1px; }
+  .badge-active { font-size: 11px; font-weight: 800; color: var(--good); background: var(--good-soft); border-radius: 999px; padding: 4px 10px; }
+
+  /* ---------- medicine level graph ---------- */
+  .medgraph { margin-top: 8px; }
+  .medgraph svg { width: 100%; height: auto; display: block; }
+  .medgraph-cap { font-size: 11.5px; color: var(--muted); font-weight: 600; text-align: center; margin-top: 5px; line-height: 1.4; }
+
+  /* ---------- segmented Today/Yesterday ---------- */
+  .seg-day { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+  .seg-day button { appearance: none; border: none; background: var(--surface-2); font-family: inherit; font-weight: 800; font-size: 12.5px; padding: 7px 15px; cursor: pointer; color: var(--muted); }
+  .seg-day button.on { background: var(--med); color: #fff; }
 </style>
 </head>
 <body>
@@ -368,7 +410,7 @@
    It is NOT medical advice. Always follow the care team's plan.
    ============================================================ */
 
-const VERSION = "1.1";
+const VERSION = "1.2";
 const STORAGE_KEY = "care-buddy-v1";
 
 /* ---------- tiny DOM helper ---------- */
@@ -395,12 +437,14 @@ let storageOK = (() => {
   try { localStorage.setItem("_t", "1"); localStorage.removeItem("_t"); return true; }
   catch { return false; }
 })();
-let memoryState = null;
+let memoryRoot = null;
 
+/* One profile = one kid. defaultState() returns a fresh profile. */
 function defaultState() {
   return {
-    version: 1,
+    id: null,
     setupDone: false,
+    medsEnabled: true,
     kidName: "",
     buddyName: "Sunny",
     settings: {
@@ -409,6 +453,7 @@ function defaultState() {
       perTap: 1,
       doseAM: "08:00",
       dosePM: "20:00",
+      soundOn: false,
     },
     today: { date: todayKey(), water: 0, doses: { am: null, pm: null }, celebrated: false },
     lastDoseAt: null,
@@ -420,6 +465,7 @@ function defaultState() {
     stickers: [],
   };
 }
+function genId() { return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
 /* Coerce any loaded/imported blob into a safe, complete state shape.
    Used by BOTH loadState() and importData() so restores can't crash or inject. */
@@ -435,14 +481,21 @@ function sanitizeAppearance(ap) {
     pet: ["none", "cat", "dog", "bunny"].includes(ap.pet) ? ap.pet : "none",
   };
 }
+/* Normalize ONE profile into a safe, complete shape. */
 function normalizeState(data) {
   const def = defaultState();
   const s = Object.assign(def, (data && typeof data === "object") ? data : {});
+  if (typeof s.id !== "string" || !s.id) s.id = genId();
+  s.medsEnabled = (s.medsEnabled === undefined || s.medsEnabled === null) ? true : !!s.medsEnabled;
+  s.setupDone = !!s.setupDone;
+  s.kidName = typeof s.kidName === "string" ? s.kidName : "";
+  s.buddyName = (typeof s.buddyName === "string" && s.buddyName.trim()) ? s.buddyName : "Sunny";
   s.settings = Object.assign(defaultState().settings, s.settings || {});
   s.settings.waterGoal = clampInt(s.settings.waterGoal, 1, 30, 6);
   s.settings.perTap = clampInt(s.settings.perTap, 1, 32, 1);
   if (typeof s.settings.doseAM !== "string") s.settings.doseAM = "08:00";
   if (typeof s.settings.dosePM !== "string") s.settings.dosePM = "20:00";
+  s.settings.soundOn = !!s.settings.soundOn;
   s.appearance = sanitizeAppearance(s.appearance);
   if (!Array.isArray(s.stickers)) s.stickers = [];
   if (typeof s.history !== "object" || !s.history) s.history = {};
@@ -451,20 +504,63 @@ function normalizeState(data) {
   s.today.doses = Object.assign({ am: null, pm: null }, s.today.doses || {});
   for (const k of ["am", "pm"]) s.today.doses[k] = Number.isFinite(s.today.doses[k]) ? s.today.doses[k] : null;
   if (!Number.isFinite(s.lastDoseAt)) s.lastDoseAt = null;
+  if (!Number.isFinite(s.stars) || s.stars < 0) s.stars = 0;
+  if (!Number.isFinite(s.bestStreak) || s.bestStreak < 0) s.bestStreak = 0;
   return s;
 }
 
-function loadState() {
+/* The root holds every profile + which one is active. */
+function defaultRoot() {
+  const p = defaultState(); p.id = genId();
+  return { version: 2, activeProfileId: p.id, profiles: [p] };
+}
+function normalizeRoot(data) {
+  if (data && Array.isArray(data.profiles) && data.profiles.length) {
+    const profiles = data.profiles.map(normalizeState);
+    let activeId = data.activeProfileId;
+    if (!profiles.some(p => p.id === activeId)) activeId = profiles[0].id;
+    return { version: 2, activeProfileId: activeId, profiles };
+  }
+  // migrate a v1 single-profile blob into a one-profile root (no data loss)
+  if (data && typeof data === "object" && (data.settings || data.today || data.setupDone !== undefined)) {
+    const p = normalizeState(data);
+    return { version: 2, activeProfileId: p.id, profiles: [p] };
+  }
+  return defaultRoot();
+}
+function loadRoot() {
   let raw = null;
   if (storageOK) { try { raw = localStorage.getItem(STORAGE_KEY); } catch {} }
-  else if (memoryState) return memoryState;
-  if (!raw) return defaultState();
-  try { return normalizeState(JSON.parse(raw)); } catch { return defaultState(); }
+  else if (memoryRoot) return memoryRoot;
+  if (!raw) return defaultRoot();
+  try { return normalizeRoot(JSON.parse(raw)); } catch { return defaultRoot(); }
 }
+function activeProfile() { return store.profiles.find(p => p.id === store.activeProfileId) || store.profiles[0]; }
 
 function save() {
-  if (storageOK) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { storageOK = false; } }
-  if (!storageOK) memoryState = state;
+  if (storageOK) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch { storageOK = false; } }
+  if (!storageOK) memoryRoot = store;
+}
+
+/* ---------- profile management ---------- */
+function switchProfile(id) {
+  if (store.activeProfileId === id) return;
+  store.activeProfileId = id; state = activeProfile();
+  editingDose = null; editSettings = null; view = "home"; save(); render();
+}
+function addProfile() {
+  const p = defaultState(); p.id = genId();
+  store.profiles.push(p); store.activeProfileId = p.id; state = activeProfile();
+  editingDose = null; editSettings = null; onboardDraft = null; view = "home"; save(); render();
+}
+function deleteProfile(id) {
+  if (store.profiles.length <= 1) { alert("This is the only profile. Add another first if you want to remove this one."); return; }
+  const p = store.profiles.find(x => x.id === id); if (!p) return;
+  if (!confirm("Delete " + (p.kidName || p.buddyName || "this profile") + " and all of their data? This can't be undone.")) return;
+  store.profiles = store.profiles.filter(x => x.id !== id);
+  if (store.activeProfileId === id) store.activeProfileId = store.profiles[0].id;
+  state = activeProfile(); save();
+  if (view === "settings") openSettings(); else render();
 }
 
 /* ---------- date / time helpers ---------- */
@@ -512,7 +608,7 @@ function ensureToday() {
   // finalize the stored day into history
   const t = state.today;
   const g = state.settings.waterGoal;
-  const perfect = t.water >= g && !!t.doses.am && !!t.doses.pm;
+  const perfect = t.water >= g && (state.medsEnabled ? (!!t.doses.am && !!t.doses.pm) : true);
   state.history[t.date] = {
     water: t.water, goal: g,
     am: !!t.doses.am, pm: !!t.doses.pm, perfect,
@@ -539,19 +635,32 @@ function currentStreak() {
    Gentle by design — recovers instantly when she logs water or a dose.        */
 const DAY_START = 7 * 60, DAY_END = 20 * 60;
 
+function moodFromHealth(health) {
+  if (health >= 85) return "thriving";
+  if (health >= 66) return "happy";
+  if (health >= 46) return "okay";
+  if (health >= 26) return "tired";
+  return "unwell";
+}
 function wellness() {
   const t = state.today, set = state.settings;
   const now = minutesNow();
 
-  // hydration
+  // hydration — gentle in the morning, droops only as the day passes while behind
   let hyd;
   if (t.water >= set.waterGoal) hyd = 1;
   else {
     const frac = Math.max(0, Math.min(1, (now - DAY_START) / (DAY_END - DAY_START)));
-    const paceTarget = set.waterGoal * frac;
-    hyd = paceTarget <= 0.01 ? 1 : Math.max(0, Math.min(1, t.water / paceTarget));
+    const completion = Math.max(0, Math.min(1, t.water / set.waterGoal));
+    hyd = Math.max(0, Math.min(1, 1 - frac * (1 - completion)));
   }
   const hydBehind = t.water < set.waterGoal && hyd < 0.7;
+
+  // water-only profile: health comes from hydration alone
+  if (!state.medsEnabled) {
+    const health = Math.round(hyd * 100);
+    return { health, mood: moodFromHealth(health), hydBehind, dueNow: null, lateNow: null, perfect: t.water >= set.waterGoal, doses: [] };
+  }
 
   // medicine
   const doses = [
@@ -569,19 +678,10 @@ function wellness() {
     }
   }
   const medPct = dueShare > 0 ? earned / dueShare : 1;
-
   const health = Math.round(hyd * 50 + medPct * 50);
+  const perfect = t.water >= set.waterGoal && !!t.doses.am && !!t.doses.pm;
 
-  let mood;
-  if (health >= 85) mood = "thriving";
-  else if (health >= 66) mood = "happy";
-  else if (health >= 46) mood = "okay";
-  else if (health >= 26) mood = "tired";
-  else mood = "unwell";
-
-  const perfect = t.water >= set.waterGoal && t.doses.am && t.doses.pm;
-
-  return { health, mood, hydBehind, dueNow, lateNow, perfect, doses };
+  return { health, mood: moodFromHealth(health), hydBehind, dueNow, lateNow, perfect, doses };
 }
 
 function statusMessage(w) {
@@ -841,17 +941,61 @@ const TIPS = [
 /* ============================================================
    RENDER
    ============================================================ */
-let state = loadState();
+let store = loadRoot();
+let state = activeProfile();
 let view = "home"; // "home" | "settings" | "history" | "rewards" | "customize"
 let editSettings = null;
 let customizeDraft = null;
 let historyMonth = null;
 let selectedDay = null;
 let editingDose = null;
+let editDoseDay = "today"; // "today" | "yesterday" — which day the dose editor logs to
+let lastNudgeKey = null;   // de-dupes the reminder chime per dose per day
+let audioCtx = null;
+let onboardDraft = null;   // persists onboarding form across re-renders
 
 const root = document.getElementById("app");
 
 function go(v) { view = v; selectedDay = null; window.scrollTo(0, 0); render(); }
+
+/* ---------- profile switcher bar ---------- */
+const PROFILE_COLORS = ["#2bb3a6", "#39b6e8", "#7c5cff", "#ff8d6e", "#e0a000", "#ff6fa3", "#4caf50"];
+function profileInitial(p) { const n = (p.kidName || p.buddyName || "?").trim(); return n ? n[0].toUpperCase() : "?"; }
+function profileColor(p) { let hsh = 0; for (const c of (p.id || "x")) hsh = (hsh * 31 + c.charCodeAt(0)) >>> 0; return PROFILE_COLORS[hsh % PROFILE_COLORS.length]; }
+function renderProfileBar() {
+  const bar = h("div", { class: "profile-bar" });
+  for (const p of store.profiles) {
+    const active = p.id === store.activeProfileId;
+    bar.appendChild(h("button", { class: "profile-pill" + (active ? " active" : ""), onclick: () => switchProfile(p.id) },
+      h("span", { class: "av", style: { background: profileColor(p) } }, profileInitial(p)),
+      h("span", null, p.kidName || p.buddyName || "Kid")
+    ));
+  }
+  bar.appendChild(h("button", { class: "profile-add", "aria-label": "Add a kid", title: "Add a kid", onclick: () => addProfile() }, "+"));
+  return bar;
+}
+
+/* ---------- optional gentle sound (Web Audio) ---------- */
+function playTone(freq, startDelay, dur, peak) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const t0 = audioCtx.currentTime + startDelay;
+    const osc = audioCtx.createOscillator(), g = audioCtx.createGain();
+    osc.type = "sine"; osc.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g); g.connect(audioCtx.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.03);
+  } catch {}
+}
+function chime(type) {
+  if (!state.settings.soundOn) return;
+  if (type === "done") { playTone(660, 0, 0.18, 0.12); playTone(990, 0.12, 0.22, 0.10); }
+  else if (type === "nudge") { playTone(880, 0, 0.16, 0.09); playTone(740, 0.18, 0.20, 0.08); }
+  else { playTone(880, 0, 0.20, 0.10); }
+}
 
 function render() {
   ensureToday();
@@ -905,6 +1049,9 @@ function renderHome() {
     h("p", null, prettyDate())
   ));
 
+  // profile switcher
+  wrap.appendChild(renderProfileBar());
+
   // stats strip
   wrap.appendChild(h("div", { class: "stats-strip" },
     h("button", { class: "stat", onclick: () => openHistory() }, h("span", { class: "em" }, "🔥"), h("b", null, String(streak)), h("span", null, streak === 1 ? "day streak" : "day streak")),
@@ -913,13 +1060,14 @@ function renderHome() {
   ));
 
   // buddy
+  const doseDue = state.medsEnabled && !!(w.dueNow || w.lateNow);
   const [skyTop, skyBot] = skyForMood(w.mood);
   const [msg, emoji] = statusMessage(w);
   const buddyCard = h("div", { class: "card buddy-card", style: { "--sky-top": skyTop, "--sky-bot": skyBot } },
     h("button", { class: "customize-fab", "aria-label": "Customize buddy", onclick: () => openCustomize() }, "✏️"),
-    h("div", { class: "buddy-stage buddy-bob", id: "buddyStage", title: "Tap to customize",
+    h("div", { class: "buddy-stage buddy-bob" + (doseDue ? " buddy-attention" : ""), id: "buddyStage", title: "Tap to customize",
       onclick: () => openCustomize(),
-      html: buddySVG(w.mood, { thirsty: w.hydBehind, doseDue: !!(w.dueNow || w.lateNow) }) },
+      html: buddySVG(w.mood, { thirsty: w.hydBehind, doseDue }) },
       petEl(state.appearance.pet, w.health >= 46)),
     h("div", { class: "buddy-status" }),
     h("div", { class: "health-bar" }, h("div", { class: "health-fill", style: { width: w.health + "%", background: healthColor(w.health) } })),
@@ -928,6 +1076,22 @@ function renderHome() {
   buddyCard.querySelector(".buddy-status").innerHTML =
     emoji + " " + escapeHtml(msg).replace(escapeHtml(state.buddyName), () => '<span class="buddy-name">' + escapeHtml(state.buddyName) + "</span>");
   wrap.appendChild(buddyCard);
+
+  // reminder nudge
+  if (doseDue) {
+    const which = (w.lateNow || w.dueNow).label;
+    const who = state.kidName ? state.kidName + "'s" : "the";
+    wrap.appendChild(h("div", { class: "nudge-banner" + (w.lateNow ? " late" : "") },
+      h("span", { class: "nudge-emoji" }, "⏰"),
+      h("span", null, w.lateNow
+        ? ("Time for " + who + " " + which + " medicine — it's running late. Tap ✓ when it's done.")
+        : ("Time for " + who + " " + which + " medicine! Tap ✓ when it's done."))
+    ));
+    const nudgeKey = store.activeProfileId + ":" + todayKey() + ":" + (w.lateNow || w.dueNow).key;
+    if (nudgeKey !== lastNudgeKey) { lastNudgeKey = nudgeKey; chime("nudge"); }
+  } else {
+    lastNudgeKey = null;
+  }
 
   // all-goals streak banner
   if (streak >= 1) {
@@ -957,8 +1121,8 @@ function renderHome() {
     )
   ));
 
-  // medicine
-  wrap.appendChild(renderMedicine(w));
+  // medicine (only for kids who take it)
+  if (state.medsEnabled) wrap.appendChild(renderMedicine(w));
 
   // tip
   wrap.appendChild(h("div", { class: "card tip-card" },
@@ -1000,6 +1164,9 @@ function renderMedicine(w) {
   card.appendChild(doseRow("am", "🌅", "Morning", set.doseAM, w));
   card.appendChild(doseRow("pm", "🌙", "Evening", set.dosePM, w));
 
+  // medicine-in-body picture
+  card.appendChild(renderMedGraph());
+
   if (w.lateNow) {
     card.appendChild(h("div", { class: "careteam-note" },
       h("span", null, "⚠️"),
@@ -1007,6 +1174,82 @@ function renderMedicine(w) {
     ));
   }
   return card;
+}
+
+function fmtHourLabel(ts) {
+  const d = new Date(ts); let hr = d.getHours(); const ap = hr >= 12 ? "PM" : "AM"; hr = hr % 12; if (hr === 0) hr = 12;
+  return hr + " " + ap;
+}
+/* A stylized "medicine in the body" curve (NOT real pharmacokinetics):
+   each dose ramps up to a peak ~30 min later, then decays before the next dose. */
+function medLevelData() {
+  const set = state.settings;
+  const now = Date.now();
+  const H = 3600000;
+  const winStart = now - 13 * H, winEnd = now + 13 * H;
+  const events = [];
+  for (let off = -1; off <= 1; off++) {
+    for (const key of ["am", "pm"]) {
+      const hhmm = key === "am" ? set.doseAM : set.dosePM;
+      const sched = doseDateToday(hhmm, off).getTime();
+      let taken = false, t = sched;
+      if (off === 0) { if (state.today.doses[key]) { taken = true; t = state.today.doses[key]; } }
+      else if (off === -1) { const hist = state.history[prevKey(todayKey())]; taken = hist ? !!hist[key] : false; }
+      const future = sched > now;
+      if (taken || future) events.push({ t: taken ? t : sched, taken });
+    }
+  }
+  const ka = 8 / H, ke = (Math.LN2 / 4) / H, coef = ka / (ka - ke); // peak ~0.5h, half-life ~4h
+  const kernel = dt => dt < 0 ? 0 : coef * (Math.exp(-ke * dt) - Math.exp(-ka * dt));
+  const N = 90, pts = []; let maxV = 0;
+  for (let i = 0; i <= N; i++) {
+    const t = winStart + (winEnd - winStart) * i / N;
+    let v = 0; for (const e of events) v += kernel(t - e.t);
+    pts.push({ t, v }); if (v > maxV) maxV = v;
+  }
+  const norm = maxV > 0 ? maxV : 1;
+  pts.forEach(p => p.y = p.v / norm);
+  return { pts, now, winStart, winEnd, events };
+}
+function renderMedGraph() {
+  const d = medLevelData();
+  const W = 320, Hh = 120, padL = 10, padR = 10, padT = 14, padB = 22;
+  const innerW = W - padL - padR, innerH = Hh - padT - padB;
+  const X = t => padL + innerW * (t - d.winStart) / (d.winEnd - d.winStart);
+  const Y = lvl => padT + innerH * (1 - lvl);
+  const nowX = X(d.now), baseY = Y(0);
+  const coords = d.pts.map(p => ({ x: X(p.t), y: Y(p.y), t: p.t }));
+  const past = coords.filter(c => c.t <= d.now), future = coords.filter(c => c.t >= d.now);
+  const toPath = arr => arr.map((c, i) => (i ? "L" : "M") + c.x.toFixed(1) + " " + c.y.toFixed(1)).join(" ");
+  let area = "";
+  if (past.length) {
+    area = "M" + past[0].x.toFixed(1) + " " + baseY.toFixed(1) + " " +
+      past.map(c => "L" + c.x.toFixed(1) + " " + c.y.toFixed(1)).join(" ") +
+      " L" + past[past.length - 1].x.toFixed(1) + " " + baseY.toFixed(1) + " Z";
+  }
+  let marks = "";
+  for (const e of d.events) {
+    if (e.t < d.winStart || e.t > d.winEnd) continue;
+    marks += `<circle cx="${X(e.t).toFixed(1)}" cy="${baseY.toFixed(1)}" r="3.4" fill="${e.taken ? 'var(--med)' : '#c9bff0'}" stroke="#fff" stroke-width="1"/>`;
+  }
+  const svg = `<svg viewBox="0 0 ${W} ${Hh}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A simple picture of medicine level across the day">
+    <line x1="${padL}" y1="${baseY.toFixed(1)}" x2="${W - padR}" y2="${baseY.toFixed(1)}" stroke="#e4e8f0" stroke-width="1"/>
+    ${area ? `<path d="${area}" fill="#ece6ff"/>` : ""}
+    <path d="${toPath(past)}" fill="none" stroke="var(--med)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${toPath(future)}" fill="none" stroke="#b9a8f5" stroke-width="2.5" stroke-dasharray="4 4" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="${nowX.toFixed(1)}" y1="${padT}" x2="${nowX.toFixed(1)}" y2="${baseY.toFixed(1)}" stroke="#9aa6ad" stroke-width="1.3" stroke-dasharray="2 3"/>
+    <text x="${nowX.toFixed(1)}" y="${padT - 4}" fill="#6a52cc" font-size="9" font-weight="800" text-anchor="middle">now</text>
+    ${marks}
+    <text x="${padL}" y="${Hh - 7}" fill="#9aa6ad" font-size="9" font-weight="700">${fmtHourLabel(d.winStart)}</text>
+    <text x="${(W / 2).toFixed(0)}" y="${Hh - 7}" fill="#9aa6ad" font-size="9" font-weight="700" text-anchor="middle">${fmtHourLabel(d.now)}</text>
+    <text x="${W - padR}" y="${Hh - 7}" fill="#9aa6ad" font-size="9" font-weight="700" text-anchor="end">${fmtHourLabel(d.winEnd)}</text>
+    <text x="${padL + 2}" y="${padT + 5}" fill="#b3a9d6" font-size="8.5" font-weight="700">more</text>
+  </svg>`;
+  const gwrap = h("div", { class: "medgraph" }); gwrap.innerHTML = svg;
+  return h("div", { style: { marginTop: "10px" } },
+    gwrap,
+    h("div", { class: "medgraph-cap" }, "💊 How much medicine is in the body — a simple picture (rises ~30 min after a dose, dips before the next). Not a real measurement.")
+  );
 }
 
 function doseRow(key, ico, title, hhmm, w) {
@@ -1020,12 +1263,19 @@ function doseRow(key, ico, title, hhmm, w) {
     return h("div", { class: "dose dose-editing" },
       h("div", { class: "dose-ico" + (key === "am" ? " sun" : "") }, ico),
       h("div", { class: "dose-info" },
-        h("div", { class: "dose-title" }, "What time was the " + title.toLowerCase() + " dose taken today?"),
+        h("div", { class: "dose-title" }, "What time was the " + title.toLowerCase() + " dose taken?"),
+        h("div", { class: "seg-day" },
+          h("button", { class: editDoseDay === "today" ? "on" : "", onclick: () => { editDoseDay = "today"; render(); } }, "Today"),
+          h("button", { class: editDoseDay === "yesterday" ? "on" : "", onclick: () => { editDoseDay = "yesterday"; render(); } }, "Yesterday")
+        ),
         h("div", { class: "dose-edit-row" },
           h("input", { type: "time", value: val, oninput: e => val = e.target.value }),
           h("span", { class: "tz-chip" }, tzAbbr())
         ),
-        h("div", { class: "hint", style: { marginTop: "5px" } }, "Records today. A time later than now saves as right now.")
+        h("div", { class: "hint", style: { marginTop: "5px" } },
+          editDoseDay === "yesterday"
+            ? "Records to yesterday — for an evening dose given before midnight."
+            : "Records today. A time later than now saves as right now.")
       ),
       h("div", { class: "dose-edit-actions" },
         h("button", { class: "btn btn-good btn-mini", onclick: () => saveDoseTime(key, val) }, "Save"),
@@ -1098,19 +1348,50 @@ function markDose(key) {
   recomputeLastDose();
   save();
   render();
+  chime("done");
   checkCelebrate();
   checkStickers();
 }
-function startEditDose(key) { editingDose = key; render(); }
+function startEditDose(key) {
+  editingDose = key;
+  // after midnight, default the evening dose to "yesterday" (likely catching up)
+  editDoseDay = (key === "pm" && !state.today.doses[key] && new Date().getHours() < 5) ? "yesterday" : "today";
+  render();
+}
 function saveDoseTime(key, hhmm) {
   if (!hhmm) { editingDose = null; render(); return; }
+  if (editDoseDay === "yesterday") { logDoseYesterday(key, hhmm); return; }
   // a logged dose is always in the past — never store a future time
   state.today.doses[key] = Math.min(tsFromHHMMToday(hhmm), Date.now());
   editingDose = null;
   recomputeLastDose();
   save();
   render();
+  chime("done");
   checkCelebrate();
+  checkStickers();
+}
+// log a dose that was actually taken yesterday (e.g. the evening dose, recorded after midnight)
+function logDoseYesterday(key, hhmm) {
+  const yk = prevKey(todayKey());
+  const g = state.settings.waterGoal;
+  // moving (not duplicating): if this dose was marked taken today, clear today's entry
+  if (state.today.doses[key]) state.today.doses[key] = null;
+  const hist = state.history[yk] || { water: 0, goal: g, am: false, pm: false, perfect: false };
+  hist[key] = true;
+  const wasPerfect = !!hist.perfect;
+  hist.perfect = hist.water >= hist.goal && (state.medsEnabled ? (hist.am && hist.pm) : true);
+  if (hist.perfect && !wasPerfect) state.stars += 1;
+  state.history[yk] = hist;
+  // reflect in the "time since last dose" timer
+  const d = keyToDate(yk); d.setHours(0, 0, 0, 0); d.setMinutes(parseHHMM(hhmm));
+  const cand = Math.min(d.getTime(), Date.now());
+  const times = [cand, ...Object.values(state.today.doses).filter(Boolean)];
+  state.lastDoseAt = Math.min(Math.max(...times), Date.now());
+  editingDose = null;
+  save();
+  render();
+  chime("done");
   checkStickers();
 }
 function recomputeLastDose() {
@@ -1139,7 +1420,13 @@ function checkCelebrate() {
 }
 
 /* ---------- Settings ---------- */
-function openSettings() { editSettings = JSON.parse(JSON.stringify(state.settings)); editSettings.kidName = state.kidName; editSettings.buddyName = state.buddyName; view = "settings"; render(); }
+function openSettings() {
+  editSettings = JSON.parse(JSON.stringify(state.settings));
+  editSettings.kidName = state.kidName;
+  editSettings.buddyName = state.buddyName;
+  editSettings.medsEnabled = state.medsEnabled;
+  view = "settings"; render();
+}
 function closeSettings() { view = "home"; render(); }
 
 function renderSettings() {
@@ -1149,6 +1436,26 @@ function renderSettings() {
     h("div", { class: "brand" }, h("button", { class: "icon-btn", "aria-label": "Back", onclick: closeSettings }, "‹"), h("span", null, "Settings")),
     h("button", { class: "btn btn-good btn-mini", onclick: saveSettings }, "Save")
   ));
+
+  // profiles
+  wrap.appendChild(h("div", { class: "section-title" }, "Who's using Care Buddy"));
+  const profCard = h("div", { class: "card" });
+  for (const p of store.profiles) {
+    const active = p.id === store.activeProfileId;
+    profCard.appendChild(h("div", { class: "prof-row" },
+      h("span", { class: "av", style: { background: profileColor(p) } }, profileInitial(p)),
+      h("div", { class: "pinfo" },
+        h("div", { class: "pname" }, p.kidName || p.buddyName || "Kid"),
+        h("div", { class: "psub" }, "Buddy: " + (p.buddyName || "Sunny") + (p.medsEnabled ? " · medicine on" : " · water only"))
+      ),
+      active ? h("span", { class: "badge-active" }, "Active")
+             : h("button", { class: "btn btn-ghost btn-mini", onclick: () => switchProfile(p.id) }, "Switch"),
+      store.profiles.length > 1 ? h("button", { class: "undo-link danger", onclick: () => deleteProfile(p.id) }, "Delete") : null
+    ));
+  }
+  profCard.appendChild(h("button", { class: "btn btn-ghost btn-block", style: { marginTop: "10px" }, onclick: () => addProfile() }, "➕ Add a kid"));
+  wrap.appendChild(profCard);
+  wrap.appendChild(h("div", { class: "section-title" }, "This profile"));
 
   wrap.appendChild(h("div", { class: "card" },
     field("Your name", h("input", { type: "text", value: s.kidName || "", placeholder: "(optional)", oninput: e => s.kidName = e.target.value })),
@@ -1167,26 +1474,43 @@ function renderSettings() {
     h("div", { class: "hint" }, "Set the goal to whatever your care team recommends — this isn't medical advice.")
   ));
 
-  wrap.appendChild(h("div", { class: "section-title" }, "Medicine times"));
-  wrap.appendChild(h("div", { class: "card" },
-    h("div", { class: "field-row" },
+  wrap.appendChild(h("div", { class: "section-title" }, "Medicine"));
+  const medCard = h("div", { class: "card" });
+  medCard.appendChild(h("div", { class: "row between" },
+    h("div", { style: { fontWeight: "800", fontSize: "15px" } }, "💊 Takes daily medicine"),
+    h("button", { class: "toggle " + (s.medsEnabled ? "on" : "off"), onclick: () => { s.medsEnabled = !s.medsEnabled; render(); } }, s.medsEnabled ? "On" : "Off")
+  ));
+  if (s.medsEnabled) {
+    medCard.appendChild(h("div", { class: "field-row", style: { marginTop: "14px" } },
       field("Morning dose", h("input", { type: "time", value: s.doseAM, oninput: e => s.doseAM = e.target.value })),
       field("Evening dose", h("input", { type: "time", value: s.dosePM, oninput: e => s.dosePM = e.target.value }))
-    ),
-    h("div", { class: "hint" }, "✈️ Traveling? Nudge both doses together, then fine-tune above:"),
-    h("div", { class: "quickshift" },
+    ));
+    medCard.appendChild(h("div", { class: "hint" }, "✈️ Traveling? Nudge both doses together, then fine-tune above:"));
+    medCard.appendChild(h("div", { class: "quickshift" },
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(-60) }, "−1 hr"),
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(-30) }, "−30 min"),
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(30) }, "+30 min"),
       h("button", { class: "btn btn-ghost", onclick: () => shiftDoses(60) }, "+1 hr")
-    ),
-    h("div", { class: "travel-zones" },
+    ));
+    medCard.appendChild(h("div", { class: "travel-zones" },
       h("div", { class: "tz-now" }, "🕐 You're in " + tzAbbr() + (tzName() ? " · " + tzName() : "")),
       h("div", { class: "zone-row" }, h("span", null, "🇫🇷 France"), h("span", { class: "z" }, "CET / CEST")),
       h("div", { class: "zone-row" }, h("span", null, "🇬🇷 Greece"), h("span", { class: "z" }, "EET / EEST")),
       h("div", { class: "hint", style: { marginTop: "6px" } }, "Greece runs 1 hour ahead of France. Try to keep the two doses about 12 hours apart — follow your care team's plan.")
+    ));
+    medCard.appendChild(h("div", { class: "hint" }, gapText(s.doseAM, s.dosePM)));
+  } else {
+    medCard.appendChild(h("div", { class: "hint", style: { marginTop: "10px" } }, "Medicine tracking is off for this kid — they'll just track their water goal."));
+  }
+  wrap.appendChild(medCard);
+
+  wrap.appendChild(h("div", { class: "section-title" }, "Reminders & sound"));
+  wrap.appendChild(h("div", { class: "card" },
+    h("div", { class: "row between" },
+      h("div", { style: { fontWeight: "800", fontSize: "15px" } }, "🔔 Gentle sound"),
+      h("button", { class: "toggle " + (s.soundOn ? "on" : "off"), onclick: () => { s.soundOn = !s.soundOn; if (s.soundOn) playTone(660, 0, 0.18, 0.12); render(); } }, s.soundOn ? "On" : "Off")
     ),
-    h("div", { class: "hint", id: "gapHint" }, gapText(s.doseAM, s.dosePM))
+    h("div", { class: "hint", style: { marginTop: "8px" } }, "Plays a soft chime when a dose is logged or due (in-app only). For reminders when the app is closed, set an alarm in your device's Clock app.")
   ));
 
   wrap.appendChild(h("div", { class: "section-title" }, "About & data"));
@@ -1234,7 +1558,8 @@ function saveSettings() {
   const s = editSettings;
   state.kidName = (s.kidName || "").trim();
   state.buddyName = (s.buddyName || "").trim() || "Sunny";
-  state.settings = { waterGoal: s.waterGoal, waterUnit: s.waterUnit, perTap: s.perTap, doseAM: s.doseAM, dosePM: s.dosePM };
+  state.medsEnabled = !!s.medsEnabled;
+  state.settings = { waterGoal: s.waterGoal, waterUnit: s.waterUnit, perTap: s.perTap, doseAM: s.doseAM, dosePM: s.dosePM, soundOn: !!s.soundOn };
   save();
   closeSettings();
 }
@@ -1244,11 +1569,12 @@ function resetToday() {
   save(); render();
 }
 function resetAll() {
-  if (!confirm("Erase ALL data (settings, history, stars) and start fresh? This can't be undone.")) return;
-  state = defaultState(); save(); view = "home"; render();
+  if (!confirm("Erase data for EVERYONE (all kids, settings, history, stars) and start over? This can't be undone.")) return;
+  store = defaultRoot(); state = activeProfile(); editSettings = null; view = "home"; save(); render();
 }
 function exportData() {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  // back up the whole store (all kids)
+  const blob = new Blob([JSON.stringify(store, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = h("a", { href: url, download: "care-buddy-backup-" + todayKey() + ".json" });
   document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
@@ -1260,8 +1586,17 @@ function importData() {
     try {
       const data = JSON.parse(await f.text());
       if (!data || typeof data !== "object") throw 0;
-      state = normalizeState(data);
-      save(); view = "home"; render();
+      if (Array.isArray(data.profiles)) {
+        // full multi-kid backup → restore everything
+        store = normalizeRoot(data); state = activeProfile();
+      } else {
+        // single-profile backup → replace the current profile, keeping its slot
+        const np = normalizeState(data); np.id = state.id;
+        const idx = store.profiles.findIndex(p => p.id === state.id);
+        if (idx >= 0) store.profiles[idx] = np; else { store.profiles.push(np); store.activeProfileId = np.id; }
+        state = activeProfile();
+      }
+      editSettings = null; save(); view = "home"; render();
       alert("Restored! 💛");
     } catch { alert("Sorry, that file didn't look right."); }
   });
@@ -1270,41 +1605,51 @@ function importData() {
 
 /* ---------- Onboarding (first run) ---------- */
 function renderOnboarding() {
-  const tmp = { kidName: "", buddyName: "Sunny", waterGoal: 6, waterUnit: "cups", doseAM: "08:00", dosePM: "20:00" };
+  const tmp = onboardDraft || (onboardDraft = { kidName: "", buddyName: "Sunny", waterGoal: 6, waterUnit: "cups", doseAM: "08:00", dosePM: "20:00", medsEnabled: true });
+  const more = store.profiles.length > 1;
   const wrap = h("div");
   wrap.appendChild(h("div", { class: "greeting", style: { paddingTop: "18px" } },
-    h("h1", null, "Hi there! 👋"),
-    h("p", null, "Let's set up your care buddy. (You can change all of this later.)")
+    h("h1", null, more ? "Add a kid 👋" : "Hi there! 👋"),
+    h("p", null, "Let's set up the care buddy. (You can change all of this later.)")
   ));
   wrap.appendChild(h("div", { class: "card buddy-card", style: { "--sky-top": "#bfeaff", "--sky-bot": "#eafaff" } },
     h("div", { class: "buddy-stage buddy-bob", html: buddySVG("happy", {}) }),
-    h("div", { class: "buddy-status" }, "Take care of your buddy by drinking water and taking your medicine on time!")
+    h("div", { class: "buddy-status" }, "Take care of your buddy by reaching your goals every day!")
   ));
-  wrap.appendChild(h("div", { class: "card" },
-    field("What's your name?", h("input", { type: "text", placeholder: "(optional)", oninput: e => tmp.kidName = e.target.value })),
-    field("What will you name your buddy?", h("input", { type: "text", value: "Sunny", oninput: e => tmp.buddyName = e.target.value })),
+  const card = h("div", { class: "card" },
+    field("What's your name?", h("input", { type: "text", value: tmp.kidName, placeholder: "(optional)", oninput: e => tmp.kidName = e.target.value })),
+    field("What will you name your buddy?", h("input", { type: "text", value: tmp.buddyName, oninput: e => tmp.buddyName = e.target.value })),
     h("div", { class: "field-row" },
-      field("Water goal each day", h("input", { type: "number", min: "1", max: "30", value: 6, oninput: e => tmp.waterGoal = clampInt(e.target.value, 1, 30, 6) })),
-      field("Unit", selectEl(["cups", "glasses", "bottles", "oz", "ml"], "cups", v => tmp.waterUnit = v))
+      field("Water goal each day", h("input", { type: "number", min: "1", max: "30", value: tmp.waterGoal, oninput: e => tmp.waterGoal = clampInt(e.target.value, 1, 30, 6) })),
+      field("Unit", selectEl(["cups", "glasses", "bottles", "oz", "ml"], tmp.waterUnit, v => tmp.waterUnit = v))
     ),
-    h("div", { class: "field-row" },
-      field("Morning medicine", h("input", { type: "time", value: "08:00", oninput: e => tmp.doseAM = e.target.value })),
-      field("Evening medicine", h("input", { type: "time", value: "20:00", oninput: e => tmp.dosePM = e.target.value }))
-    ),
-    h("div", { class: "hint" }, "Tip for grown-ups: set the water goal and dose times to match the care team's plan."),
-    h("button", { class: "btn btn-good btn-block", style: { marginTop: "8px" }, onclick: () => finishOnboarding(tmp) }, "Let's go! ✨")
-  ));
+    h("div", { class: "row between", style: { margin: "2px 0 8px" } },
+      h("div", { style: { fontWeight: "800", fontSize: "14px" } }, "💊 Takes daily medicine?"),
+      h("button", { class: "toggle " + (tmp.medsEnabled ? "on" : "off"), onclick: () => { tmp.medsEnabled = !tmp.medsEnabled; render(); } }, tmp.medsEnabled ? "Yes" : "No")
+    )
+  );
+  if (tmp.medsEnabled) {
+    card.appendChild(h("div", { class: "field-row" },
+      field("Morning medicine", h("input", { type: "time", value: tmp.doseAM, oninput: e => tmp.doseAM = e.target.value })),
+      field("Evening medicine", h("input", { type: "time", value: tmp.dosePM, oninput: e => tmp.dosePM = e.target.value }))
+    ));
+  }
+  card.appendChild(h("div", { class: "hint" }, "Tip for grown-ups: set the water goal and dose times to match the care team's plan."));
+  card.appendChild(h("button", { class: "btn btn-good btn-block", style: { marginTop: "8px" }, onclick: () => finishOnboarding(tmp) }, "Let's go! ✨"));
+  wrap.appendChild(card);
   wrap.appendChild(h("div", { class: "footer" }, "Everything you enter stays on this device only."));
   return wrap;
 }
 function finishOnboarding(tmp) {
   state.kidName = (tmp.kidName || "").trim();
   state.buddyName = (tmp.buddyName || "").trim() || "Sunny";
+  state.medsEnabled = !!tmp.medsEnabled;
   state.settings.waterGoal = tmp.waterGoal;
   state.settings.waterUnit = tmp.waterUnit;
   state.settings.doseAM = tmp.doseAM;
   state.settings.dosePM = tmp.dosePM;
   state.setupDone = true;
+  onboardDraft = null;
   save();
   render();
 }
@@ -1379,7 +1724,8 @@ function legendDot(kind, label) { return h("span", { style: { display: "inline-f
 function dayData(key) {
   if (key === todayKey()) {
     const t = state.today, g = state.settings.waterGoal;
-    return { water: t.water, goal: g, am: !!t.doses.am, pm: !!t.doses.pm, perfect: t.water >= g && !!t.doses.am && !!t.doses.pm, today: true };
+    const perfect = t.water >= g && (state.medsEnabled ? (!!t.doses.am && !!t.doses.pm) : true);
+    return { water: t.water, goal: g, am: !!t.doses.am, pm: !!t.doses.pm, perfect, today: true };
   }
   return state.history[key] || null;
 }
@@ -1467,7 +1813,7 @@ function computeStats() {
     if (d.water > 0) everDrank = true;
   }
   const t = state.today, g = state.settings.waterGoal;
-  const todayPerfect = t.water >= g && !!t.doses.am && !!t.doses.pm;
+  const todayPerfect = t.water >= g && (state.medsEnabled ? (!!t.doses.am && !!t.doses.pm) : true);
   if (t.water > 0) everDrank = true;
   const streak = currentStreak() + (todayPerfect ? 1 : 0);
   return {
@@ -1496,7 +1842,9 @@ const STICKERS = [
   { id: "monthly-marvel", emoji: "👑", name: "Monthly Marvel", desc: "30 perfect days", hint: "Reach 30 perfect days", test: s => s.perfectDays >= 30 },
 ];
 
-function evaluateStickers() { const s = computeStats(); return STICKERS.filter(x => x.test(s)).map(x => x.id); }
+// medicine-specific stickers don't apply to water-only kids
+function stickerList() { return state.medsEnabled ? STICKERS : STICKERS.filter(x => !["on-time", "med-master"].includes(x.id)); }
+function evaluateStickers() { const s = computeStats(); return stickerList().filter(x => x.test(s)).map(x => x.id); }
 function checkStickers(silent) {
   const fresh = evaluateStickers().filter(id => !state.stickers.includes(id));
   if (!fresh.length) return;
@@ -1513,12 +1861,14 @@ function checkStickers(silent) {
 function renderRewards() {
   const wrap = h("div");
   wrap.appendChild(topbarBack("Rewards", null));
+  const list = stickerList();
   const earned = new Set(state.stickers);
+  const earnedShown = list.filter(s => earned.has(s.id)).length;
   wrap.appendChild(h("div", { class: "card center" },
-    h("div", { class: "rewards-progress" }, "🏅 " + earned.size + " of " + STICKERS.length + " stickers collected!")
+    h("div", { class: "rewards-progress" }, "🏅 " + earnedShown + " of " + list.length + " stickers collected!")
   ));
   const grid = h("div", { class: "sticker-grid" });
-  for (const s of STICKERS) {
+  for (const s of list) {
     const got = earned.has(s.id);
     grid.appendChild(h("div", { class: "sticker " + (got ? "got" : "locked") },
       h("div", { class: "sticker-emoji" }, got ? s.emoji : "🔒"),
